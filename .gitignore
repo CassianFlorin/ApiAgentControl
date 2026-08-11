@@ -1,0 +1,20 @@
+# Xcode
+DerivedData/
+build/
+*.xcuserstate
+xcuserdata/
+*.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist
+
+# macOS
+.DS_Store
+
+# 凭证与密钥 —— 绝不入库
+# 设备 token、中继身份密钥在 ~/.codex-watchd/auth.json（仓库外，权限 0600）
+*.p8
+auth.json
+*.mobileprovision
+*.certSigningRequest
+
+# 运行时产物
+node_modules/
+*.log

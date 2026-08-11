@@ -1,0 +1,252 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		EAFCACA09F584C24AACDA7D7 /* ApiAgentControlApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C454DE087B3149FDA3951178 /* ApiAgentControlApp.swift */; };
+		4CD1055039784F8C9857DF20 /* Crypto.swift in Sources */ = {isa = PBXBuildFile; fileRef = E52DCD2039464C1392B9E406 /* Crypto.swift */; };
+		FAE976075E6D4E208B9162B4 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79C77A86421447F7BF79D546 /* Models.swift */; };
+		FC2D7CD2E4C444FFB8BACF58 /* RelayClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B94414483C9E41D9BC575532 /* RelayClient.swift */; };
+		2E60F44E19FF4076B750C681 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2896FA4435A845899051CC9D /* AppState.swift */; };
+		952F1B4D5ABD4C2FBA941B02 /* PairingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19D588F7747145C6BB926874 /* PairingView.swift */; };
+		3702C55E67C3452D92D3E21E /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1551FBB4D9947B0B9479093 /* HomeView.swift */; };
+		E3382036AC324465B7AA16A7 /* SessionDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FB6155FC76F417A9D3344EC /* SessionDetailView.swift */; };
+		5A867B304D6C4154B1AE9295 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 6B35DFA50BBC484BB188B9DE /* Assets.xcassets */; };
+		54EB4B21D7FA42A7A7C292BB /* PushManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD7357EC93E74816935C6135 /* PushManager.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		C454DE087B3149FDA3951178 /* ApiAgentControlApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApiAgentControlApp.swift; sourceTree = "<group>"; };
+		E52DCD2039464C1392B9E406 /* Crypto.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Crypto.swift; sourceTree = "<group>"; };
+		79C77A86421447F7BF79D546 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		B94414483C9E41D9BC575532 /* RelayClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelayClient.swift; sourceTree = "<group>"; };
+		2896FA4435A845899051CC9D /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		19D588F7747145C6BB926874 /* PairingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairingView.swift; sourceTree = "<group>"; };
+		B1551FBB4D9947B0B9479093 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		4FB6155FC76F417A9D3344EC /* SessionDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionDetailView.swift; sourceTree = "<group>"; };
+		6B35DFA50BBC484BB188B9DE /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		424CC6452E524224AF22FA47 /* ApiAgentControl.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ApiAgentControl.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		DD7357EC93E74816935C6135 /* PushManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushManager.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		8FF7518F746A454790D56470 = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = ();
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		B20773C773A24B95A3446BAE = {
+			isa = PBXGroup;
+			children = (
+				ABED91D9C7D84AE7B19110EA /* ApiAgentControl */,
+				A6A6C9F612D54DFE9EFADE0C /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		A6A6C9F612D54DFE9EFADE0C /* Products */ = {
+			isa = PBXGroup;
+			children = (424CC6452E524224AF22FA47 /* ApiAgentControl.app */);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		ABED91D9C7D84AE7B19110EA /* ApiAgentControl */ = {
+			isa = PBXGroup;
+			children = (
+				C454DE087B3149FDA3951178 /* ApiAgentControlApp.swift */,
+				E52DCD2039464C1392B9E406 /* Crypto.swift */,
+				79C77A86421447F7BF79D546 /* Models.swift */,
+				B94414483C9E41D9BC575532 /* RelayClient.swift */,
+				2896FA4435A845899051CC9D /* AppState.swift */,
+				DD7357EC93E74816935C6135 /* PushManager.swift */,
+				E4016F5D49504E3393DD9AAA /* Views */,
+				6B35DFA50BBC484BB188B9DE /* Assets.xcassets */,
+			);
+			path = ApiAgentControl;
+			sourceTree = "<group>";
+		};
+		E4016F5D49504E3393DD9AAA /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				19D588F7747145C6BB926874 /* PairingView.swift */,
+				B1551FBB4D9947B0B9479093 /* HomeView.swift */,
+				4FB6155FC76F417A9D3344EC /* SessionDetailView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		2EC9486576FA4D72A0862A23 /* ApiAgentControl */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 7B767B5196F94FB5B0AB0047;
+			buildPhases = (9086E82451E743CC928008BC, 8FF7518F746A454790D56470, D4560C4EE23647ED9E837126);
+			buildRules = ();
+			dependencies = ();
+			name = ApiAgentControl;
+			productName = ApiAgentControl;
+			productReference = 424CC6452E524224AF22FA47 /* ApiAgentControl.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		6F3CF63F177A4C7FA17954C3 = {
+			isa = PBXProject;
+			attributes = { BuildIndependentTargetsInParallel = 1; LastSwiftUpdateCheck = 2660; LastUpgradeCheck = 2660; };
+			buildConfigurationList = 91E0685B6E5040929933DB7C;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (en, Base);
+			mainGroup = B20773C773A24B95A3446BAE;
+			productRefGroup = A6A6C9F612D54DFE9EFADE0C;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (2EC9486576FA4D72A0862A23 /* ApiAgentControl */);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		D4560C4EE23647ED9E837126 = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (5A867B304D6C4154B1AE9295 /* Assets.xcassets in Resources */);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		9086E82451E743CC928008BC = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				EAFCACA09F584C24AACDA7D7 /* ApiAgentControlApp.swift in Sources */,
+				4CD1055039784F8C9857DF20 /* Crypto.swift in Sources */,
+				FAE976075E6D4E208B9162B4 /* Models.swift in Sources */,
+				FC2D7CD2E4C444FFB8BACF58 /* RelayClient.swift in Sources */,
+				2E60F44E19FF4076B750C681 /* AppState.swift in Sources */,
+				54EB4B21D7FA42A7A7C292BB /* PushManager.swift in Sources */,
+				952F1B4D5ABD4C2FBA941B02 /* PairingView.swift in Sources */,
+				3702C55E67C3452D92D3E21E /* HomeView.swift in Sources */,
+				E3382036AC324465B7AA16A7 /* SessionDetailView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		00C328B62BFA4DE682313E5B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_NO_COMMON_BLOCKS = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		4C93158EA04646EC929A995A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_VERSION = 5.0;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		6DF7C8C318CC4488836F23A9 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_IDENTITY = "";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = ApiAgentControl/Info.plist;
+				CODE_SIGN_ENTITLEMENTS = ApiAgentControl/ApiAgentControl.entitlements;
+				INFOPLIST_KEY_NSCameraUsageDescription = "扫描电脑上显示的配对二维码";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks");
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.apiagentcontrol.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		0FC45646A1E94C5898E25A62 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_IDENTITY = "";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = ApiAgentControl/Info.plist;
+				CODE_SIGN_ENTITLEMENTS = ApiAgentControl/ApiAgentControl.entitlements;
+				INFOPLIST_KEY_NSCameraUsageDescription = "扫描电脑上显示的配对二维码";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks");
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.apiagentcontrol.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		91E0685B6E5040929933DB7C = {
+			isa = XCConfigurationList;
+			buildConfigurations = (00C328B62BFA4DE682313E5B /* Debug */, 4C93158EA04646EC929A995A /* Release */);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		7B767B5196F94FB5B0AB0047 = {
+			isa = XCConfigurationList;
+			buildConfigurations = (6DF7C8C318CC4488836F23A9 /* Debug */, 0FC45646A1E94C5898E25A62 /* Release */);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 6F3CF63F177A4C7FA17954C3;
+}
