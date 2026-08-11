@@ -2,7 +2,7 @@
 
 结论先行：**不需要逆向任何私有协议**。Codex CLI 内置了官方的 app-server JSON-RPC 协议，
 自带 schema 生成器，且与 Desktop 共享线程存储。已在本机完成端到端验证：
-外部进程 → `codex app-server` → 新建线程 → 发送指令 → 模型（custom API 提供方）执行并回复 → 事件流回传。
+外部进程 → `codex app-server` → 新建线程 → 发送指令 → 模型（自定义 API 提供方）执行并回复 → 事件流回传。
 
 ## 各 socket / 通道的身份鉴定
 
