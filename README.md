@@ -251,6 +251,37 @@ relay.你的域名.com {
 Caddy 默认就支持 WebSocket 升级，不用额外配置。用 Nginx 的话记得加
 `proxy_set_header Upgrade $http_upgrade;` 和 `proxy_set_header Connection "upgrade";`。
 
+**Docker + nginx-proxy-manager + Cloudflare 橙云的完整走法**（实际部署在用的组合）：
+
+```bash
+# 服务器上：构建并挂进 NPM 所在的 docker 网络，不暴露宿主端口
+scp relay/server.js relay/Dockerfile 服务器:~/apiagent-relay/
+docker build -t apiagent-relay ~/apiagent-relay
+docker run -d --name apiagent-relay --restart unless-stopped \
+  --network <NPM所在网络> -e RELAY_SECRET=<你的密钥> apiagent-relay
+```
+
+- NPM 加 Proxy Host：域名 → `http://apiagent-relay:8080`，**Websockets Support 必须打开**
+- 证书用 **Cloudflare Origin CA**（SSL/TLS → Origin Server → Create Certificate，
+  15 年免费），Custom 方式贴进 NPM，配 Force SSL —— 橙云下走 Let's Encrypt http-01
+  会跟 "Always Use HTTPS" / Full (strict) 互相打架，Origin CA 没这些破事
+- Cloudflare DNS 开**橙云**（隐藏源站 IP + DDoS 防护），SSL 模式 **Full (strict)**
+- 空闲超时无忧：中继每 30 秒发 WebSocket ping，短于 CF（100s）和 nginx（60s）的掐线阈值
+
+### 中继固定后，本地只剩 daemon 一个进程
+
+把中继地址写进 `~/.codex-watchd/relay-url`，然后装 launchd（开机自启 + 崩溃自动拉起）：
+
+```bash
+echo "wss://relay.你的域名.com" > ~/.codex-watchd/relay-url
+scripts/install-launchd.sh
+```
+
+卸载用 `scripts/install-launchd.sh --uninstall`；重启用
+`launchctl kickstart -k gui/$(id -u)/com.apiagentcontrol.daemon`。
+本地中继和 cloudflared 从此不需要了，`scripts/start.sh` 检测到 `relay-url`
+也只会起 daemon。
+
 ### 三个方案怎么选
 
 | | 要服务器 | 地址固定 | 适合 |

@@ -41,6 +41,16 @@ class AppServerClient {
   start() {
     if (this.stopped) return;
     this.proc = spawn('codex', ['app-server'], { stdio: ['pipe', 'pipe', 'pipe'] });
+    // spawn 失败（如 launchd 环境 PATH 里没有 codex）走 error 事件而非 exit。
+    // 不接住它就是 uncaught exception，整个 daemon 直接崩 —— 而这只该是
+    // 控制通道不可用，监听/中继/推送都不依赖它。
+    this.proc.on('error', (e) => {
+      console.error(`[ctl] 无法启动 codex app-server: ${e.message}（PATH 里找得到 codex 吗？）`);
+      this.proc = null;
+      if (!this.stopped) {
+        setTimeout(() => { this.backoff = Math.min(this.backoff * 2, 30_000); this.start(); }, this.backoff);
+      }
+    });
     this.proc.stderr.on('data', d => this.log(`app-server stderr: ${String(d).trim()}`));
     this.proc.stdout.on('data', d => this._onData(d));
     this.proc.on('exit', (code) => {

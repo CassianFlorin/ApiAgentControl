@@ -1,12 +1,14 @@
 #!/bin/sh
-# 一键拉起本机三件套：中继 → daemon → Cloudflare 隧道。
+# 一键拉起本机组件。
+#
+# 两种形态：
+#   - ~/.codex-watchd/relay-url 存在（固定中继，VPS/Fly.io）→ 只起 daemon
+#     ※ 这种形态更推荐 scripts/install-launchd.sh，开机自启 + 崩溃自动拉起
+#   - 不存在 → 本机三件套：中继 → daemon → Cloudflare quick tunnel
+#     ※ quick tunnel 域名每次重启都变，隧道重启后手机必须重新配对
 #
 # 可重复执行：已在跑的组件跳过，不会起第二份。
 # 停止：scripts/stop.sh；日志：~/.codex-watchd/{relay,daemon,tunnel}.log
-#
-# 注意：quick tunnel 的域名每次重启都变，配对串里嵌着旧地址 ——
-# 隧道被重启后手机必须重新配对（--pair 重新生成二维码）。
-# 固定域名要换 named tunnel / Fly.io，届时连同 launchd 一起做。
 set -e
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
@@ -17,6 +19,7 @@ RELAY_PORT=8090
 DAEMON_PORT=8787
 
 mkdir -p "$DIR"
+REMOTE_RELAY="$(cat "$DIR/relay-url" 2>/dev/null || true)"
 
 # 准入密钥：没有就生成（首次运行）
 if [ ! -f "$SECRET_FILE" ]; then
@@ -29,6 +32,28 @@ SECRET="$(cat "$SECRET_FILE")"
 # pgrep -f 按完整命令行匹配；起来后各自 sleep 一拍再验一次，
 # 否则「起了但立刻崩」会被当成成功
 running() { pgrep -f "$1" >/dev/null 2>&1; }
+
+# --- 固定中继形态：只起 daemon ---
+if [ -n "$REMOTE_RELAY" ]; then
+  if launchctl print "gui/$(id -u)/com.apiagentcontrol.daemon" >/dev/null 2>&1; then
+    echo "daemon 已由 launchd 接管，无需本脚本（重启用 launchctl kickstart -k gui/$(id -u)/com.apiagentcontrol.daemon）"
+    exit 0
+  fi
+  if running "daemon/codex-watchd.js"; then
+    echo "daemon     已在运行，跳过"
+  else
+    nohup node "$REPO/daemon/codex-watchd.js" --port "$DAEMON_PORT" \
+      --relay "$REMOTE_RELAY" --relay-secret "$SECRET" \
+      >> "$DIR/daemon.log" 2>&1 &
+    sleep 2
+    running "daemon/codex-watchd.js" || { echo "daemon 启动失败，看 $DIR/daemon.log"; exit 1; }
+    echo "daemon     :$DAEMON_PORT 已启动（中继 $REMOTE_RELAY）"
+  fi
+  echo
+  echo "配对新设备："
+  echo "  node $REPO/daemon/codex-watchd.js --pair --relay $REMOTE_RELAY --relay-secret \"\$(cat $SECRET_FILE)\" --pair-scope control"
+  exit 0
+fi
 
 # --- 1. 中继 ---
 if running "relay/server.js"; then
