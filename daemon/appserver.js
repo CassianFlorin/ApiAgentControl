@@ -31,6 +31,7 @@ class AppServerClient {
     this.pending = new Map();      // id -> {resolve, reject, timer}
     this.resumed = new Set();      // 本实例已加载的 threadId
     this.activeTurns = new Map();  // threadId -> turnId
+    this.releaseTimers = new Map(); // threadId -> 定时器（延迟释放）
     this.buf = '';
     this.ready = null;             // Promise，initialize 完成
     this.stopped = false;
@@ -51,6 +52,8 @@ class AppServerClient {
       this.pending.clear();
       this.resumed.clear();
       this.activeTurns.clear();
+      for (const t of this.releaseTimers.values()) clearTimeout(t);
+      this.releaseTimers.clear();
       this.ready = null;
       if (!this.stopped) {
         setTimeout(() => { this.backoff = Math.min(this.backoff * 2, 30_000); this.start(); }, this.backoff);
@@ -136,16 +139,47 @@ class AppServerClient {
   _trackTurns(method, params = {}) {
     if (method === 'turn/started' && params.threadId && params.turn?.id) {
       this.activeTurns.set(params.threadId, params.turn.id);
+      // 新 turn 开始，取消尚未执行的释放
+      clearTimeout(this.releaseTimers.get(params.threadId));
+      this.releaseTimers.delete(params.threadId);
     }
     if ((method === 'turn/completed' || method === 'turn/failed' || method === 'turn/aborted') && params.threadId) {
       this.activeTurns.delete(params.threadId);
+      this._scheduleRelease(params.threadId);
     }
+  }
+
+  /**
+   * turn 结束后把线程还给 Desktop。
+   *
+   * thread/resume 会让本进程持有该线程的 rollout —— Desktop 那边直接显示
+   * 「此任务正在其他位置运行」，用户在电脑上没法继续用。所以持锁窗口必须
+   * 压缩到「只在跑任务时」：turn 一结束就 thread/unsubscribe 释放，
+   * 下次手机再发指令由 ensureResumed 重新加载，代价只是一次 resume 的延迟。
+   *
+   * 延迟几秒再释放：turn/completed 之后紧跟的 thread/status/changed
+   * （waitingOnUserInput 就在里面）还得收到；立刻退订就把它丢了。
+   */
+  _scheduleRelease(threadId) {
+    if (!this.resumed.has(threadId)) return;
+    clearTimeout(this.releaseTimers.get(threadId));
+    this.releaseTimers.set(threadId, setTimeout(() => {
+      this.releaseTimers.delete(threadId);
+      if (this.activeTurns.has(threadId)) return;   // 已有新 turn，保持订阅
+      this.rpc('thread/unsubscribe', { threadId })
+        .then(r => { this.resumed.delete(threadId); this.log(`已释放线程 ${threadId} (${r?.status})`); })
+        .catch(e => this.log(`释放线程 ${threadId} 失败: ${e.message}`));
+    }, 3000));
   }
 
   // ---------- 高层操作 ----------
 
   async ensureResumed(threadId) {
     await this.ready;
+    // 有待执行的释放先取消，否则可能在 turn/start 发出后、turn/started 通知
+    // 到达前触发退订，把刚开始的 turn 的事件全丢掉
+    clearTimeout(this.releaseTimers.get(threadId));
+    this.releaseTimers.delete(threadId);
     if (this.resumed.has(threadId)) return;
     await this.rpc('thread/resume', { threadId });
     this.resumed.add(threadId);
