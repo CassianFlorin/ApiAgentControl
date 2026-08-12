@@ -181,6 +181,35 @@ final class RelayClient: NSObject, ObservableObject {
         openSocket()
     }
 
+    private var pingSeq = 0
+
+    /// 回到前台时校验连接是否真的活着。
+    ///
+    /// 锁屏期间 iOS 冻结进程，WebSocket 往往已被对端或系统掐断，但解锁后
+    /// URLSession **不一定投递任何错误** —— state 停留在「已连接」，重连按钮
+    /// 也不出现，而此后每个请求都在等死连接的 30 秒超时。用户视角就是
+    /// 「解锁进 app，整个界面卡死」。所以前台恢复时主动 ping 一次：
+    /// 3 秒内没有 pong 就当它死了，直接走重连。
+    func ensureAlive() {
+        guard pairing != nil else { return }
+        guard let t = task else { reconnect(); return }
+        pingSeq += 1
+        let seq = pingSeq
+        t.sendPing { [weak self] err in
+            Task { @MainActor in
+                guard let self, self.pingSeq == seq else { return }
+                self.pingSeq += 1          // 作废超时兜底
+                if err != nil { self.reconnect() }
+            }
+        }
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            guard let self, self.pingSeq == seq else { return }
+            self.pingSeq += 1
+            self.reconnect()
+        }
+    }
+
     private func handleFrame(_ text: String) {
         guard let data = text.data(using: .utf8),
               let frame = try? JSONDecoder().decode(RelayFrame.self, from: data) else { return }

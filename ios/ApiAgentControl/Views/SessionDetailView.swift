@@ -172,12 +172,26 @@ struct EventRow: View {
 
     private var isUser: Bool { event.kind == "user_message" }
 
+    /// agent 的回复是 Markdown。用 inlineOnlyPreservingWhitespace：
+    /// 行内样式（粗体/斜体/行内代码/链接）生效，换行与列表缩进原样保留 ——
+    /// Text 不支持块级布局，.full 会把换行和列表都吞成一团。
+    /// 用户消息保持纯文本，别把人家随手打的 * 和 ` 解析成样式。
+    private var messageText: AttributedString {
+        let raw = event.text ?? ""
+        guard !isUser else { return AttributedString(raw) }
+        return (try? AttributedString(
+            markdown: raw,
+            options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
+        )) ?? AttributedString(raw)
+    }
+
     private var messageBubble: some View {
         HStack {
             if isUser { Spacer(minLength: 40) }
             VStack(alignment: isUser ? .trailing : .leading, spacing: 2) {
-                Text(event.text ?? "")
+                Text(messageText)
                     .font(.callout)
+                    .textSelection(.enabled)
                     .padding(10)
                     .background(isUser ? Color.accentColor.opacity(0.15) : Color(.secondarySystemBackground),
                                 in: RoundedRectangle(cornerRadius: 12))
