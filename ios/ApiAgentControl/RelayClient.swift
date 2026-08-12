@@ -48,6 +48,10 @@ enum PairingStore {
 enum ConnectionState: Equatable {
     case idle, connecting, connected, hostOffline
     case failed(String)
+    /// 自动重试已用尽，等用户手动重连。
+    /// 无限自动重连给人的是"看起来在恢复"的假象 —— 实测遇到过 daemon 侧
+    /// 房间记账出错，客户端一直重连也无济于事，而界面始终显示"连接中"。
+    case givenUp(String)
 
     var label: String {
         switch self {
@@ -56,9 +60,18 @@ enum ConnectionState: Equatable {
         case .connected: return "已连接"
         case .hostOffline: return "电脑离线"
         case .failed(let m): return "连接失败：\(m)"
+        case .givenUp: return "已断开"
         }
     }
     var isUsable: Bool { self == .connected }
+    /// 是否该把「重连」按钮摆出来
+    var needsManualReconnect: Bool {
+        switch self {
+        case .givenUp, .hostOffline, .idle: return true
+        case .failed: return true
+        case .connecting, .connected: return false
+        }
+    }
 }
 
 /// 与中继的连接：WebSocket + 端到端加密的请求/响应/事件推送。
@@ -74,6 +87,10 @@ final class RelayClient: NSObject, ObservableObject {
     private var pending: [String: CheckedContinuation<(Int, Data), Error>] = [:]
     private var reconnectDelay: TimeInterval = 1
     private var shouldReconnect = true
+    /// 自动重试次数。只覆盖切网、锁屏这类瞬时抖动；连续失败就停下让用户决定，
+    /// 而不是无限后台重试制造"正在恢复"的错觉。
+    private var autoRetriesLeft = 0
+    private static let maxAutoRetries = 3
 
     var onEvent: ((AgentEvent) -> Void)?
 
@@ -88,6 +105,7 @@ final class RelayClient: NSObject, ObservableObject {
     func connect(_ p: PairingPayload) {
         pairing = p
         shouldReconnect = true
+        autoRetriesLeft = Self.maxAutoRetries
         do { crypto = try SessionCrypto(hostPublicKeySPKI: p.hostKey, roomId: p.room) }
         catch { state = .failed(error.localizedDescription); return }
         openSocket()
@@ -136,13 +154,31 @@ final class RelayClient: NSObject, ObservableObject {
         pending.removeAll()
         task = nil
         guard shouldReconnect else { return }
+
+        guard autoRetriesLeft > 0 else {
+            // 重试用尽：明确停在"已断开"，把决定权交回用户
+            state = .givenUp(reason)
+            return
+        }
+        autoRetriesLeft -= 1
         state = .failed(reason)
         let delay = reconnectDelay
-        reconnectDelay = min(reconnectDelay * 2, 30)
+        reconnectDelay = min(reconnectDelay * 2, 8)
         Task {
             try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
             if self.shouldReconnect && self.task == nil { self.openSocket() }
         }
+    }
+
+    /// 用户主动重连。重置退避与重试次数，立即尝试。
+    func reconnect() {
+        guard pairing != nil else { return }
+        shouldReconnect = true
+        reconnectDelay = 1
+        autoRetriesLeft = Self.maxAutoRetries
+        task?.cancel(with: .goingAway, reason: nil)
+        task = nil
+        openSocket()
     }
 
     private func handleFrame(_ text: String) {
@@ -152,7 +188,10 @@ final class RelayClient: NSObject, ObservableObject {
         // 中继自身的明文状态通知
         if let type = frame.type, frame.env == nil {
             switch type {
-            case "host_online": state = .connected; reconnectDelay = 1
+            case "host_online":
+                state = .connected
+                reconnectDelay = 1
+                autoRetriesLeft = Self.maxAutoRetries
             case "host_offline": state = .hostOffline
             default: break
             }

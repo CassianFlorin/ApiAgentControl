@@ -237,6 +237,9 @@ struct SettingsView: View {
             List {
                 Section("连接") {
                     LabeledContent("状态", value: app.connection.label)
+                    if app.connection.needsManualReconnect {
+                        Button("重新连接") { app.reconnect() }
+                    }
                     if let p = app.pairing {
                         LabeledContent("中继", value: p.relay)
                         LabeledContent("房间", value: String(p.room.prefix(10)) + "…")

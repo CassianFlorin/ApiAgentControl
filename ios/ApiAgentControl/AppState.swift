@@ -98,6 +98,13 @@ final class AppState: ObservableObject {
         relay.connect(p)
     }
 
+    /// 用户主动重连。自动重试只覆盖瞬时抖动，连续失败后由用户决定何时再试。
+    func reconnect() {
+        errorMessage = nil
+        relay.reconnect()
+        Task { await refresh() }
+    }
+
     func unpair() {
         relay.disconnect()
         PairingStore.clear()

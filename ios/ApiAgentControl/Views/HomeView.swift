@@ -73,13 +73,21 @@ struct HomeView: View {
                 }
 
                 if app.projects.isEmpty && !app.loading {
-                    ContentUnavailableView(
-                        "暂无会话",
-                        systemImage: "tray",
-                        description: Text(app.connection.isUsable
-                                          ? "电脑上还没有近期活动的会话"
-                                          : app.connection.label)
-                    )
+                    if app.connection.isUsable {
+                        ContentUnavailableView("暂无会话", systemImage: "tray",
+                            description: Text("电脑上还没有近期活动的会话"))
+                    } else {
+                        ContentUnavailableView {
+                            Label(app.connection.label, systemImage: "bolt.horizontal.circle")
+                        } description: {
+                            Text(app.connection == .hostOffline
+                                 ? "电脑侧的 daemon 没有连上中继。确认它在运行后再重连。"
+                                 : "已停止自动重试。")
+                        } actions: {
+                            Button("重新连接") { app.reconnect() }
+                                .buttonStyle(.borderedProminent)
+                        }
+                    }
                 }
             }
             .navigationTitle("Codex")
@@ -108,22 +116,38 @@ struct HomeView: View {
     }
 }
 
+/// 连接状态徽章。断开时**本身就是重连按钮** ——
+/// 状态显示在哪，重连入口就该在哪，不该让用户去别处找。
 struct ConnectionBadge: View {
+    @EnvironmentObject var app: AppState
     let state: ConnectionState
+
     var body: some View {
-        HStack(spacing: 4) {
-            Circle().frame(width: 8, height: 8).foregroundStyle(color)
-            Text(state.label).font(.caption2)
+        Button {
+            guard state.needsManualReconnect else { return }
+            app.reconnect()
+        } label: {
+            HStack(spacing: 4) {
+                if case .connecting = state {
+                    ProgressView().controlSize(.mini)
+                } else {
+                    Circle().frame(width: 8, height: 8).foregroundStyle(color)
+                }
+                Text(state.needsManualReconnect ? "重连" : state.label)
+                    .font(.caption2)
+            }
+            .foregroundStyle(state.needsManualReconnect ? Color.accentColor : .secondary)
         }
-        .foregroundStyle(.secondary)
+        .disabled(!state.needsManualReconnect)
     }
+
     private var color: Color {
         switch state {
         case .connected: return .green
         case .connecting: return .yellow
         case .hostOffline: return .orange
         case .idle: return .gray
-        case .failed: return .red
+        case .failed, .givenUp: return .red
         }
     }
 }
