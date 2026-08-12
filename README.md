@@ -246,6 +246,43 @@ Caddy 默认就支持 WebSocket 升级，不用额外配置。用 Nginx 的话�
 - **一定要用 `wss://` 而不是 `ws://`**。方案一二自动就是；VPS 方案要自己配 TLS。
 - 中继**不需要**和 daemon 在同一台机器。方案一之所以放在本机，纯粹是图省事。
 
+## 发版（Xcode Cloud）
+
+### 流水线怎么配
+
+Xcode Cloud 的 workflow 存在 App Store Connect 服务端，**仓库里没有对应文件**，
+只能在 **Xcode → Integrate → Manage Workflows…** 里改。建议配两条：
+
+| workflow | 触发条件 | Action | 用途 |
+|---|---|---|---|
+| CI | Branch Changes → `main` | Archive，Deployment Preparation 选 **Do Not Prepare for Distribution** | 每次提交验证能否编译，不做分发 |
+| Release | **Tag Changes** → `v*` | Archive + **TestFlight (Internal Testing Only)** | 打 tag 才发版 |
+
+分成两条是为了：日常提交快速验证、不触发分发；只有你主动打 tag 才走签名与上传，
+省构建额度也避免误发。
+
+### 打 tag 发版
+
+```bash
+git tag v0.2.0
+git push origin v0.2.0
+```
+
+版本号会**自动从 tag 取**——`ci_scripts/ci_pre_xcodebuild.sh` 在构建前把
+`v0.2.0` 写进 `MARKETING_VERSION`，把 Xcode Cloud 的 `CI_BUILD_NUMBER`
+写进 `CURRENT_PROJECT_VERSION`，工程里不用手工改版本。
+
+**为什么必须这么做**：TestFlight 要求每次上传的构建号唯一且递增。
+工程里的 `CURRENT_PROJECT_VERSION` 是写死的，不处理的话第一次能传、
+**第二次会被拒**，而报错只说"该值已被使用"，不会指向工程配置——很难查。
+
+tag 不是版本号格式（比如 `hotfix-abc`）时脚本不会乱改版本，只更新构建号。
+
+### 发 TestFlight 前必须改的一处
+
+`~/.codex-watchd/auth.json` 里 `apns.production` 要改成 `true`。
+TestFlight 走 production APNs，配置对不上推送会静默失效（见 [docs/push.md](docs/push.md)）。
+
 ## 命令速查
 
 ```bash
