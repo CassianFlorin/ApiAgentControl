@@ -12,12 +12,17 @@
 #
 # 直接改 pbxproj 而不用 agvtool：agvtool 需要 VERSIONING_SYSTEM=apple-generic，
 # 且对多配置的处理不如直接替换直观。CI 上的检出是一次性的，改了不影响仓库。
+#
+# 注意：ci_scripts/ 必须与 .xcodeproj **同级**（这里是 ios/）。放在仓库根目录时
+# Xcode Cloud 找不到，只打印 "Pre-Xcodebuild script not found" 并标为成功，
+# 于是版本号注入静默失效，构建照样绿。
 set -e
 
-REPO="${CI_PRIMARY_REPOSITORY_PATH:-$(cd "$(dirname "$0")/.." && pwd)}"
+REPO="${CI_PRIMARY_REPOSITORY_PATH:-$(cd "$(dirname "$0")/../.." && pwd)}"
 PBX="$REPO/ios/ApiAgentControl.xcodeproj/project.pbxproj"
 
-[ -f "$PBX" ] || { echo "找不到 $PBX，跳过"; exit 0; }
+# 这里宁可让构建失败也不静默跳过：版本号错了要等上传 TestFlight 才会发现。
+[ -f "$PBX" ] || { echo "错误：找不到 $PBX"; exit 1; }
 
 if [ -n "$CI_BUILD_NUMBER" ]; then
   sed -i '' "s/CURRENT_PROJECT_VERSION = .*;/CURRENT_PROJECT_VERSION = $CI_BUILD_NUMBER;/g" "$PBX"

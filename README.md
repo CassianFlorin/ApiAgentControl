@@ -251,15 +251,26 @@ Caddy 默认就支持 WebSocket 升级，不用额外配置。用 Nginx 的话�
 ### 流水线怎么配
 
 Xcode Cloud 的 workflow 存在 App Store Connect 服务端，**仓库里没有对应文件**，
-只能在 **Xcode → Integrate → Manage Workflows…** 里改。建议配两条：
+只能在 **Xcode → Integrate → Manage Workflows…** 里改。当前配置：
 
-| workflow | 触发条件 | Action | 用途 |
-|---|---|---|---|
-| CI | Branch Changes → `main` | Archive，Deployment Preparation 选 **Do Not Prepare for Distribution** | 每次提交验证能否编译，不做分发 |
-| Release | **Tag Changes** → `v*` | Archive + **TestFlight (Internal Testing Only)** | 打 tag 才发版 |
+| workflow | 触发条件 | Action |
+|---|---|---|
+| Release | **Tag Changes** → 开头为 `v` 的标签 | Archive + **TestFlight（仅限内部测试）** |
 
-分成两条是为了：日常提交快速验证、不触发分发；只有你主动打 tag 才走签名与上传，
-省构建额度也避免误发。
+只留 tag 触发意味着**推到 `main` 不跑任何 CI**，`ci_post_clone.sh` 里的自检也只在
+发版时才执行。本地随时可以补上：`node daemon/selftest.js`。
+
+### CI 脚本的位置很关键
+
+`ci_scripts/` 必须与 `.xcodeproj` **同级**，本项目即 `ios/ci_scripts/`，
+**不是仓库根目录**。放错了 Xcode Cloud 不会报错，只打印一行
+
+```
+Post-Clone script not found at ci_scripts/ci_post_clone.sh
+```
+
+并且**把该步骤标成成功**。于是自检和版本号注入全程没跑，构建照样是绿的——
+本项目踩过这个坑，直到发现上传的版本号还是工程里写死的值才察觉。
 
 ### 打 tag 发版
 
@@ -268,7 +279,7 @@ git tag v0.2.0
 git push origin v0.2.0
 ```
 
-版本号会**自动从 tag 取**——`ci_scripts/ci_pre_xcodebuild.sh` 在构建前把
+版本号会**自动从 tag 取**——`ios/ci_scripts/ci_pre_xcodebuild.sh` 在构建前把
 `v0.2.0` 写进 `MARKETING_VERSION`，把 Xcode Cloud 的 `CI_BUILD_NUMBER`
 写进 `CURRENT_PROJECT_VERSION`，工程里不用手工改版本。
 
@@ -278,10 +289,15 @@ git push origin v0.2.0
 
 tag 不是版本号格式（比如 `hotfix-abc`）时脚本不会乱改版本，只更新构建号。
 
-### 发 TestFlight 前必须改的一处
+### 装上 TestFlight 版本之后必须改的一处
 
-`~/.codex-watchd/auth.json` 里 `apns.production` 要改成 `true`。
-TestFlight 走 production APNs，配置对不上推送会静默失效（见 [docs/push.md](docs/push.md)）。
+`~/.codex-watchd/auth.json` 里 `apns.production` 要改成 `true`，然后**重启 daemon**
+（推送环境在构造时定死，不会热更新），启动日志应显示"推送 APNs 生产环境"。
+
+时机是**手机装好 TestFlight 版本之后**，不是打 tag 之前：这个开关是全局二选一，
+提前翻掉会让当前 Xcode 直装的版本（sandbox token）立刻收不到推送。
+换成 TestFlight 版本后 device token 也变了，需要**重新配对一次**。
+配置对不上时推送会静默失效——不报错、无日志（见 [docs/push.md](docs/push.md)）。
 
 ## 命令速查
 
