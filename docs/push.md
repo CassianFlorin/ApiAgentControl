@@ -48,7 +48,7 @@ Extension 和 App Group 权限，就已经是完全隐私的**——比"加密�
 1. **APNs 鉴权密钥**：开发者后台 → Keys → 新建，勾选 Apple Push Notifications service，
    下载 `AuthKey_XXXXXXXXXX.p8`（**只能下载一次**）。记下 Key ID。
 2. **Team ID**：开发者后台右上角，或 Membership 页。
-3. **Bundle ID**：把 `com.apiagentcontrol.app` 改成你自己的，并在开发者后台注册、
+3. **Bundle ID**：本项目用 `com.cassianflorin.apiagentcontrol`。需在开发者后台注册、
    勾选 Push Notifications 能力。
 
 然后在 `~/.codex-watchd/auth.json` 里加一段（该文件权限 0600）：
@@ -59,7 +59,7 @@ Extension 和 App Group 权限，就已经是完全隐私的**——比"加密�
   "apns": {
     "keyId": "ABCD123456",
     "teamId": "XYZ9876543",
-    "bundleId": "com.yourname.apiagentcontrol",
+    "bundleId": "com.cassianflorin.apiagentcontrol",
     "p8Path": "/Users/you/AuthKey_ABCD123456.p8",
     "production": false      // 用 Xcode 直接装到手机上时是 false（沙盒）
   }

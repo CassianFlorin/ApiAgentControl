@@ -15,7 +15,7 @@ xcodebuild -project ios/ApiAgentControl.xcodeproj -scheme ApiAgentControl \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro' build
 ```
 
-最低 iOS 17，Bundle ID `com.apiagentcontrol.app`（上真机前改成你自己的，并配好签名团队）。
+最低 iOS 17，Bundle ID `com.cassianflorin.apiagentcontrol`。换成你自己的账号时，记得同步改 `~/.codex-watchd/auth.json` 里 apns 段的 `bundleId` —— 两边必须一致。
 
 ## 配对
 
@@ -84,7 +84,7 @@ swiftc -O ios/ApiAgentControl/Crypto.swift <测试文件> -o /tmp/cryptotest
 
 ## 装到真机
 
-1. 把 Bundle ID 从 `com.apiagentcontrol.app` 改成你自己的（Xcode → Signing & Capabilities）
+1. Bundle ID 已设为 `com.cassianflorin.apiagentcontrol`，Team 已配置；换账号时在 Xcode → Signing & Capabilities 改
 2. 选你的 Team，勾上 Push Notifications 能力
 3. `ApiAgentControl.entitlements` 里的 `aps-environment` 保持 `development`
 4. 手机与 Mac 在同一网络时可直连（`--bind 0.0.0.0`），否则需要部署中继
