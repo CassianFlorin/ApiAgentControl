@@ -17,6 +17,9 @@
 
 # 使用手册
 
+> 只想尽快跑起来？[docs/deployment-guide.md](docs/deployment-guide.md)
+> 是从零到手机可用的一页式部署教程（本地快速方案 / VPS 固定方案二选一）。
+
 ## 它解决什么
 
 OAuth 登录的 Codex 云任务有官方移动端可管，但**本地会话**（Desktop / CLI，尤其是
