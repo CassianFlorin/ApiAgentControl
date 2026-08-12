@@ -289,6 +289,12 @@ git push origin v0.2.0
 
 tag 不是版本号格式（比如 `hotfix-abc`）时脚本不会乱改版本，只更新构建号。
 
+**别复用 tag 名。** 构建失败后想用 `git tag -f` 把同名 tag 指到新 commit 重推，
+Xcode Cloud **不一定会触发**——GitHub 对强制更新发出的是 `forced` 而非 `created`
+事件，实测同样的操作有时起构建、有时毫无反应，且不留任何记录。
+每次重试都递一个新版本号（`v0.1.1`、`v0.1.2`）既能稳定触发，
+也让 TestFlight 里的每个包都能对应回一份不可变的代码。
+
 ### 装上 TestFlight 版本之后必须改的一处
 
 `~/.codex-watchd/auth.json` 里 `apns.production` 要改成 `true`，然后**重启 daemon**
