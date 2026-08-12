@@ -2,6 +2,15 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- 出口合规声明。缺了它 Xcode Cloud 的「Prepare Build for App Store Connect」
+	     无法自动完成 TestFlight 分发，会以 "Preparing build ... failed" 失败，
+	     而归档与 export 都已成功，前面步骤全绿，很难看出原因。
+
+	     填 false 的依据：加密只用了标准公开算法（X25519 / AES-256-GCM，
+	     经系统 CryptoKit），用于保护本 app 自己的数据，加密本身不是对外提供的功能。
+	     若将来要上架公开 App Store，这一项需重新评估，可能要提交自分类报告（ERN）。 -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
