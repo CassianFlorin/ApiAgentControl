@@ -43,13 +43,30 @@ Extension 和 App Group 权限，就已经是完全隐私的**——比"加密�
 
 单纯"任务完成"不推。同一会话的同类通知用 `apns-collapse-id` 合并，不会刷屏。
 
+## 推送的边界：谁能推给谁
+
+APNs 的信任模型按**开发者团队 + Bundle ID** 锁死：推送请求必须用
+**拥有该 Bundle ID 的团队**签发的 `.p8` 密钥签名，别的团队的密钥造不出有效签名。
+这决定了两种使用方式的差别：
+
+| 使用方式 | 会话查看/发指令/审批 | 推送 |
+|---|---|---|
+| 装作者分发的包（TestFlight / App Store）+ 自部署后台 | ✓ 全部可用 | ✗ **不可用**——你的 daemon 没有（也不该有）作者的 `.p8` 密钥 |
+| 从源码构建：改成自己的 Bundle ID + 自己的 APNs 密钥 | ✓ | ✓ |
+
+作者的 APNs 密钥**不随项目分发**：它是全局凭证，持有者能给所有装了该 app 的
+设备推任意通知。本项目也不提供集中式推送网关（见 README 的自托管定位）。
+所以：**要推送，就从源码构建**，用自己的开发者账号（Bundle ID 换成你自己的，
+下面三项凭证也都用你自己的）。只装官方包的话，除推送外一切功能正常——
+app 在前台时靠加密长连接实时刷新，不受影响。
+
 ## 你需要准备的（只有这一步需要开发者账号）
 
 1. **APNs 鉴权密钥**：开发者后台 → Keys → 新建，勾选 Apple Push Notifications service，
    下载 `AuthKey_XXXXXXXXXX.p8`（**只能下载一次**）。记下 Key ID。
 2. **Team ID**：开发者后台右上角，或 Membership 页。
-3. **Bundle ID**：本项目用 `com.cassianflorin.apiagentcontrol`。需在开发者后台注册、
-   勾选 Push Notifications 能力。
+3. **Bundle ID**：本项目用 `com.cassianflorin.apiagentcontrol`（自建时换成你自己的，
+   工程与 auth.json 保持一致）。需在开发者后台注册、勾选 Push Notifications 能力。
 
 然后在 `~/.codex-watchd/auth.json` 里加一段（该文件权限 0600）：
 
