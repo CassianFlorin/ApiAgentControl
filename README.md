@@ -13,6 +13,180 @@
                                     └──────→ [APNs] ──→ [iOS App]
 ```
 
+---
+
+# 使用手册
+
+## 它解决什么
+
+OAuth 登录的 Codex 云任务有官方移动端可管，但**本地会话**（Desktop / CLI，尤其是
+API key 方式启动的）完全脱管——人离开电脑，会话就失联了。
+最难受的是 Codex 停下来等你：等审批、或者用文字问了你一句，
+而你在地铁上、在会议室，只能等回到电脑前。
+
+这个项目就是补上这一环。
+
+## 前置条件
+
+- macOS，Node ≥ 20（`node --version` 确认）
+- 已安装 Codex（`codex --version`）
+- iPhone 或模拟器；装真机需要 Apple 开发者账号
+
+## 第一次跑起来
+
+### 1. 启动 daemon
+
+```bash
+node daemon/codex-watchd.js
+```
+
+终端会打印一个**带 token 的调试页地址**，浏览器打开就能看到实时会话流——
+先用它确认 daemon 正常工作，再去折腾手机。
+
+daemon 会自动发现 `~/.codex` 下所有会话，无论是 Desktop、CLI 还是 VSCode 插件开的。
+
+### 2. 启动中继
+
+手机和电脑通常不在同一网络，需要一个中继帮它们碰面：
+
+```bash
+node relay/server.js --port 8090 --secret 你自己起一个密钥
+```
+
+本机测试就跑在本机。**要在外面用，得把它部署到有公网的地方**
+（VPS 或 Cloudflare，见 [docs/relay.md](docs/relay.md)），并且套 TLS 用 `wss://`。
+
+然后让 daemon 接上它——重启 daemon 时带上参数：
+
+```bash
+node daemon/codex-watchd.js --relay ws://中继地址:8090 --relay-secret 你的密钥
+```
+
+### 3. 配对手机
+
+```bash
+node daemon/codex-watchd.js --pair \
+  --relay ws://中继地址:8090 --relay-secret 你的密钥 \
+  --pair-scope control
+```
+
+会打印一个 `apiagentcontrol://pair?d=...` 的配对串。三种导入方式：
+
+- **扫码**（推荐）：`qrencode -t ANSIUTF8 "<配对串>"` 在终端里生成二维码，用 App 扫
+- **点链接**：把配对串发到手机上点开（已注册 URL scheme）
+- **粘贴**：复制进 App 的输入框
+
+> 配对串等同一把钥匙，别转发给别人。
+
+模拟器上可以直接：`xcrun simctl openurl <UDID> "<配对串>"`
+
+## 日常使用
+
+### 首页
+
+三段结构，和你 Codex Desktop 侧栏**完全一致**：置顶 / 项目 / 最近。
+置顶的顺序就是你在 Desktop 里排的顺序。
+
+最上面是**「需要我处理」**——跨所有项目聚合，两类：
+
+| 卡片 | 什么情况 | 你能做什么 |
+|---|---|---|
+| 🔒 需要审批 | Codex 要执行命令 / 改文件，在等批准 | 看清命令内容后点「允许」「始终允许」「拒绝」 |
+| 💬 等你回复 | 模型用文字问了你一句然后停下 | 直接在卡片里回复，不用点进会话 |
+
+带「推测」标签的是启发式判断的（协议不提供这个信号，详见
+[docs/waiting-detection.md](docs/waiting-detection.md)），可能偶有误判。
+
+### 会话详情
+
+点任意会话进去，是完整的对话记录：
+
+- **往上翻**能加载更早的历史，一直到「— 会话开始 —」
+- 工具调用默认**折叠成一行**，点开看详情——一个 turn 里工具和推理的条数是正经消息的
+  十倍，不折叠没法看
+- 右上角菜单里可以打开「显示推理过程」、打断正在跑的任务
+- 底部输入框直接发指令
+
+### 权限档位怎么选
+
+配对时用 `--pair-scope` 指定，**默认是 `read`**：
+
+| 档位 | 能做什么 | 什么时候用 |
+|---|---|---|
+| `read` | 只能看 | 给别人演示，或你只想随时瞄一眼进度 |
+| `approve` | 能批准命令，但**不能回文字** | 只想远程放行命令，不交出输入能力 |
+| `control` | 能发任意指令 | **想在手机上真正接着干活，只能选这个** |
+
+要提醒的是：`approve` 在实际使用中够呛——最常见的「卡住等你」不是结构化审批，
+而是模型用文字问你一句，那种情况只能回文字，也就必须是 `control`。
+
+而 `control` 等同远程 shell（agent 会照着执行你发的任何东西），手机丢了等于机器失守。
+这是绕不过去的取舍，自己权衡。
+
+改档位需要重新配对：
+
+```bash
+node daemon/codex-watchd.js --list-devices        # 看当前有哪些设备
+node daemon/codex-watchd.js --revoke-device <id>  # 吊销
+node daemon/codex-watchd.js --pair --pair-scope control ...   # 重新配
+```
+
+### 开启推送
+
+不开推送，App 退到后台就收不到任何东西（iOS 会杀掉长连接），
+"人不在电脑前收到审批请求"这个核心场景就不成立。
+
+手机上：设置页 → 开启通知。
+电脑上：需要配 APNs 凭证，步骤见 [docs/push.md](docs/push.md)。
+
+通知内容**不含任何会话信息**（只写"有一条需要处理"），因为 APNs 服务器能看到推送体，
+而你的会话标题本身就带业务信息。真实内容在你点开后由 App 经加密通道取。
+
+## 出问题了怎么办
+
+| 现象 | 原因与处理 |
+|---|---|
+| 手机显示「电脑离线」 | daemon 没连上中继。确认 daemon 和中继都在跑，然后点左上角**「重连」** |
+| 手机显示「已断开」 | 自动重试 3 次后停了（刻意设计，见下）。点左上角「重连」 |
+| 「配对凭证已失效」 | 设备被吊销了，或换了 Bundle ID。点「重新配对」按新配对串重配 |
+| 看不到某个会话 | 归档的会话默认不显示；子代理线程也不显示（跟随 Codex 自己的判定） |
+| 会话只显示一串 UUID | 该会话既没被命名、也没有可提取的用户消息，属正常 |
+| 推送收不到 | 检查 `auth.json` 里 apns 段的 `bundleId` 是否和工程一致；<br>Xcode 直接装的必须 `"production": false`，用错会一直 `BadDeviceToken` |
+| 手机上发不了指令 | 当前设备是 `read` 或 `approve` 档位，需要 `control` |
+
+**为什么不做无限自动重连**：它给人的是"看起来在恢复"的假象。
+实测遇到过中继侧记账出错，客户端一直重连也无济于事，界面却始终显示"连接中"，
+反而掩盖了真实状态。所以自动重试只覆盖切网、锁屏这类瞬时抖动（3 次），
+之后停下来把决定权交给你。
+
+## 命令速查
+
+```bash
+# daemon
+node daemon/codex-watchd.js                          # 启动（默认只监听本机）
+node daemon/codex-watchd.js --relay ws://... --relay-secret ...   # 接入中继
+node daemon/codex-watchd.js --bind 0.0.0.0           # 暴露到局域网（配合 Tailscale 直连）
+node daemon/codex-watchd.js --verbose                # 打印更多事件
+node daemon/selftest.js                              # 自检，不碰你的 ~/.codex
+
+# 设备与配对
+node daemon/codex-watchd.js --list-devices
+node daemon/codex-watchd.js --pair --relay ws://... --pair-scope read|approve|control
+node daemon/codex-watchd.js --revoke-device <id>
+
+# 中继
+node relay/server.js --port 8090 --secret <密钥>
+curl http://127.0.0.1:8090/health                    # 看房间与连接数
+```
+
+配置与凭证都在 `~/.codex-watchd/auth.json`（权限 0600，不在仓库里）。
+
+---
+
+# 实现说明
+
+以下是设计取舍与实测记录，日常使用不需要看。
+
 ## codex-watchd（监听 + 控制 daemon）
 
 零依赖 Node.js（需 Node ≥ 20，macOS）。两条通道互补：
