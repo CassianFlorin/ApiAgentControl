@@ -127,8 +127,13 @@ class PushSender {
  *
  * 只推「需要你动手」的时刻。进行中的每一条都推，一轮对话能炸出几十条通知，
  * 用户会直接关掉推送权限 —— 那比不做还糟。
+ *
+ * @param {object} [opts]
+ * @param {boolean} [opts.remoteInitiated] 该 turn 由手机（中继）发起。
+ *   发起人必然不在电脑前，答案回来了却不通知等于白问 —— 所以完成时一律推，
+ *   「不打扰」逻辑只适用于电脑本地发起的 turn。
  */
-function pushableEvent(ev, session) {
+function pushableEvent(ev, session, opts = {}) {
   const title = session?.title || '会话';
   switch (ev.kind) {
     case 'approval_request':
@@ -139,16 +144,18 @@ function pushableEvent(ev, session) {
         subtitle: title,
         collapseId: `approval-${ev.approval_id}`,
       };
-    case 'turn_complete':
-      // 只有「停下来在问你」才推；单纯干完活不打扰
-      if (session?.status !== 'waiting_input') return null;
+    case 'turn_complete': {
+      // 「停下来在问你」或「你在手机上发起的」才推；单纯干完活不打扰
+      const waiting = session?.status === 'waiting_input';
+      if (!waiting && !opts.remoteInitiated) return null;
       return {
-        reason: 'waiting_input',
-        title: '等你回复',
+        reason: waiting ? 'waiting_input' : 'remote_turn_done',
+        title: waiting ? '等你回复' : '已回复',
         body: String(ev.last_message || session?.lastAssistantMessage || '').slice(0, 120),
         subtitle: title,
         collapseId: `reply-${ev.session_id}`,
       };
+    }
     case 'turn_aborted':
       return { reason: 'aborted', title: '任务已中止', body: title, subtitle: title,
                collapseId: `abort-${ev.session_id}` };

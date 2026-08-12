@@ -181,7 +181,20 @@ class AppServerClient {
     clearTimeout(this.releaseTimers.get(threadId));
     this.releaseTimers.delete(threadId);
     if (this.resumed.has(threadId)) return;
-    await this.rpc('thread/resume', { threadId });
+    try {
+      await this.rpc('thread/resume', { threadId });
+    } catch (e) {
+      // Codex 的硬约束：同一线程同时只允许一个写入方。Desktop 正打开着这个
+      // 会话时 resume 必然失败，原始报错是英文内部术语（thread-store conflict:
+      // already has an active writer），直接透给手机等于没提示。
+      if (/active writer|thread-store conflict/i.test(e.message || '')) {
+        throw Object.assign(
+          new Error('该会话正在电脑上的 Codex Desktop 中打开。同一会话同时只能有一方操作：请直接在电脑上继续，或在 Desktop 里离开该会话后重试。'),
+          { status: 409 }
+        );
+      }
+      throw e;
+    }
     this.resumed.add(threadId);
   }
 

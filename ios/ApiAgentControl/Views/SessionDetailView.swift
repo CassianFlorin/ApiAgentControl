@@ -116,22 +116,36 @@ struct SessionDetailView: View {
 
     @ViewBuilder private var composer: some View {
         if app.scope.canControl {
-            HStack(spacing: 8) {
-                TextField("发送指令…", text: $input, axis: .vertical)
-                    .textFieldStyle(.roundedBorder)
-                    .lineLimit(1...4)
-                    .focused($inputFocused)
-                Button {
-                    let text = input
-                    input = ""
-                    inputFocused = false
-                    Task { await app.send(sessionId, text: text) }
-                } label: {
-                    Image(systemName: "arrow.up.circle.fill").font(.title2)
+            VStack(spacing: 4) {
+                // 发送失败必须显示在手边，而不是只在首页横幅 ——
+                // 人在这个页面里发的，错误就得在这个页面里看见
+                if let msg = app.errorMessage {
+                    Text(msg)
+                        .font(.caption).foregroundStyle(.red)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal)
                 }
-                .disabled(input.trimmingCharacters(in: .whitespaces).isEmpty || !app.connection.isUsable)
+                HStack(spacing: 8) {
+                    TextField("发送指令…", text: $input, axis: .vertical)
+                        .textFieldStyle(.roundedBorder)
+                        .lineLimit(1...4)
+                        .focused($inputFocused)
+                    Button {
+                        let text = input
+                        input = ""
+                        inputFocused = false
+                        Task {
+                            // 失败还原输入，别让用户重敲一遍
+                            if await app.send(sessionId, text: text) == false { input = text }
+                        }
+                    } label: {
+                        Image(systemName: "arrow.up.circle.fill").font(.title2)
+                    }
+                    .disabled(input.trimmingCharacters(in: .whitespaces).isEmpty || !app.connection.isUsable)
+                }
+                .padding(.horizontal)
             }
-            .padding(.horizontal).padding(.vertical, 8)
+            .padding(.vertical, 8)
         } else {
             Text("当前设备权限为「\(app.scope.label)」，无法发送指令")
                 .font(.caption2).foregroundStyle(.secondary)

@@ -337,11 +337,18 @@ final class AppState: ObservableObject {
         }
     }
 
-    func send(_ sessionId: String, text: String) async {
+    /// 返回是否成功 —— 调用方据此决定要不要还原输入框。
+    /// 失败必须让用户在**当前页面**看到：错误只出现在首页横幅的话，
+    /// 人在详情页里发送就是纯静默（真机实测：撞上 Desktop 写锁时用户完全无感）。
+    @discardableResult
+    func send(_ sessionId: String, text: String) async -> Bool {
+        errorMessage = nil
         do {
             _ = try await relay.request("POST", "/threads/\(sessionId)/turns", body: ["text": text])
+            return true
         } catch {
             handle(error)
+            return false
         }
     }
 

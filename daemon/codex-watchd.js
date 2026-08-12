@@ -1014,7 +1014,9 @@ async function handleControl(req, res, url) {
       const body = await readBody(req);
       if (!body.text) return sendJson(res, 400, { error: 'text is required' });
       const { text, ...extra } = body;
-      return sendJson(res, 200, await ctl.startTurn(seg[1], text, extra));
+      const result = await ctl.startTurn(seg[1], text, extra);
+      remoteTurns.add(seg[1]);   // 记下发起来源，完成时据此决定要不要推送
+      return sendJson(res, 200, result);
     }
     // POST /threads/:id/interrupt — 打断当前 turn
     if (req.method === 'POST' && seg[0] === 'threads' && seg[2] === 'interrupt') {
@@ -1143,6 +1145,10 @@ let auth;
 let relay = null;
 let push = null;
 
+// 由手机（中继）发起、尚未结束的 turn 所在线程。发起人必然不在电脑前，
+// 这些 turn 完成时要推送（电脑本地发起的按「不打扰」逻辑）。
+const remoteTurns = new Set();
+
 /**
  * 推送：只在「需要你动手」时发，且内容加密。
  *
@@ -1153,7 +1159,9 @@ let push = null;
 function maybePush(ev) {
   if (!push || !relay) return;
   const session = sessions.get(ev.session_id);
-  const info = pushableEvent(ev, session);
+  const remoteInitiated = (ev.kind === 'turn_complete' || ev.kind === 'turn_aborted')
+    && remoteTurns.delete(ev.session_id);   // 一次性消费
+  const info = pushableEvent(ev, session, { remoteInitiated });
   if (!info) return;
 
   for (const dev of auth.devices) {
