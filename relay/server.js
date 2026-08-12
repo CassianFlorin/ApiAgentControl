@@ -126,12 +126,17 @@ function attach(conn, roomId) {
   const room = getRoom(roomId);
 
   if (conn.role === 'host') {
-    if (room.host && room.host.alive) {
-      // 同一房间只允许一个 daemon；新连接顶掉旧的（daemon 重启后重连的常见情形）
-      room.host.send(JSON.stringify({ type: 'replaced' }));
-      room.host.close();
-    }
+    const old = room.host;
+    // 先把新 host 装上，再关旧的。
+    // 反过来的话，close() 会同步触发旧连接的 onClose：它看到 room.host 仍是自己，
+    // 于是置空并（在无客户端时）把房间从表里删掉；等我们再赋值时，
+    // 房间对象已经不在 rooms 里了 —— daemon 明明连着，/health 却显示 0 个房间，
+    // 手机随后接入只会被告知"电脑离线"。daemon 每次重启都会踩到。
     room.host = conn;
+    if (old && old.alive) {
+      old.send(JSON.stringify({ type: 'replaced' }));
+      old.close();
+    }
     log(`host 已连接 room=${roomId} (在线客户端 ${room.clients.size})`);
     for (const c of room.clients) c.send(JSON.stringify({ type: 'host_online' }));
   } else {
@@ -163,7 +168,12 @@ function attach(conn, roomId) {
       log(`client 断开 room=${roomId} (剩 ${room.clients.size})`);
       if (room.host?.alive) room.host.send(JSON.stringify({ type: 'client_offline' }));
     }
-    if (!room.host && room.clients.size === 0) rooms.delete(roomId);
+    // 只有当表里存的仍是**这个**房间对象时才允许删。
+    // onClose 闭包捕获的是旧的 room 对象，若中途房间已被新对象取代，
+    // 按 id 直接删会把当前正在用的房间误删（陈旧闭包杀掉活跃连接）。
+    if (!room.host && room.clients.size === 0 && rooms.get(roomId) === room) {
+      rooms.delete(roomId);
+    }
   };
 }
 

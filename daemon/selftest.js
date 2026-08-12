@@ -228,6 +228,44 @@ async function main() {
     !!myRepo && myRepo.sessions.length === 2,
     projects.map(p => `${p.project}(${p.sessions.length})`).join(' '));
 
+  // ---- 中继房间记账 ----
+  // 两个都是实际踩到的：手机长时间显示"电脑离线"，重启 daemon 也不恢复。
+  {
+    const { spawn: spawnProc } = require('child_process');
+    const { WsClient } = require('./relay-client');
+    const rport = 19000 + Math.floor(Math.random() * 900);
+    const relay = spawnProc('node', [path.join(__dirname, '../relay/server.js'), '--port', String(rport)],
+      { stdio: 'ignore' });
+    await sleep(1200);
+    const room = 'selftest-room-abcdefgh';
+    const wsUrl = r => `ws://127.0.0.1:${rport}/?room=${room}&role=${r}`;
+    const rhealth = () => new Promise(res => {
+      http.get(`http://127.0.0.1:${rport}/health`, r => {
+        let b = ''; r.on('data', d => b += d); r.on('end', () => { try { res(JSON.parse(b)); } catch { res({}); } });
+      }).on('error', () => res({}));
+    });
+
+    const h1 = new WsClient(wsUrl('host'), {});
+    await sleep(500);
+    // host 被替换（daemon 重启的常见情形）且此时无客户端在线
+    const h2 = new WsClient(wsUrl('host'), {});
+    await sleep(700);
+    const afterReplace = await rhealth();
+    check('中继：host 被替换后房间不能被误删',
+      afterReplace.rooms === 1, `rooms=${afterReplace.rooms} connections=${afterReplace.connections}`);
+
+    // 新客户端必须看到 host 在线；这一步同时覆盖"握手与首帧同段到达"
+    let first = null;
+    const c1 = new WsClient(wsUrl('client'), { onMessage: m => { if (!first) first = m; } });
+    await sleep(700);
+    check('中继：客户端接入后能收到 host_online（首帧不得随握手丢失）',
+      (first || '').includes('host_online'), `收到 ${first}`);
+
+    h1.close(); h2.close(); c1.close();
+    relay.kill();
+    await sleep(200);
+  }
+
   // ---- 推送触发规则 ----
   // 只推「需要你动手」的时刻。进行中的每条都推，一轮对话能炸出几十条通知，
   // 用户会直接关掉推送权限 —— 那比不做还糟。

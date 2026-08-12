@@ -96,7 +96,11 @@ class WsClient {
         'Sec-WebSocket-Version': '13',
       },
     });
-    req.on('upgrade', (res, socket) => {
+    // 第三个参数 head 是随握手响应一起到达的、属于升级后协议的字节。
+    // 服务端在 101 之后立刻发帧时（中继就是这样：客户端一接入就发 host_online），
+    // 这一帧极可能与响应头合进同一个 TCP 段，从而落在 head 里。
+    // 丢掉 head 就等于静默丢掉第一条消息 —— 表现为"连上了但状态永远不更新"。
+    req.on('upgrade', (res, socket, head) => {
       const expect = crypto.createHash('sha1').update(key + WS_GUID).digest('base64');
       if (res.headers['sec-websocket-accept'] !== expect) { socket.destroy(); this._die(); return; }
       this.socket = socket;
@@ -106,6 +110,7 @@ class WsClient {
       socket.on('close', () => this._die());
       socket.on('error', () => this._die());
       this.onOpen();
+      if (head && head.length) this._feed(head);   // 必须在 onOpen 之后喂，回调此时才就绪
     });
     req.on('error', () => this._die());
     req.on('response', () => this._die());   // 未升级成功
