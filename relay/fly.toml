@@ -1,0 +1,21 @@
+# Fly.io 部署配置。用法见 README「中继部署」。
+#   fly launch --no-deploy --copy-config   # 首次，会让你选区域并生成 app 名
+#   fly secrets set RELAY_SECRET=<你的密钥>
+#   fly deploy
+app = "apiagentcontrol-relay"
+primary_region = "hkg"          # 换成离你近的区域
+
+[build]
+  dockerfile = "Dockerfile"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # 中继是长连接，不能自动停机，否则 daemon 与手机会被反复断开
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

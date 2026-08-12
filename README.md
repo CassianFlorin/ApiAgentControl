@@ -53,8 +53,9 @@ daemon 会自动发现 `~/.codex` 下所有会话，无论是 Desktop、CLI 还�
 node relay/server.js --port 8090 --secret 你自己起一个密钥
 ```
 
-本机测试就跑在本机。**要在外面用，得把它部署到有公网的地方**
-（VPS 或 Cloudflare，见 [docs/relay.md](docs/relay.md)），并且套 TLS 用 `wss://`。
+先在本机跑通即可。**要在外面（4G / 公司网络）用，中继得有个公网地址** ——
+最省事的是一条 `cloudflared` 命令把本机中继暴露出去，不需要服务器也不需要域名，
+详见下面的 [中继部署](#中继部署)。
 
 然后让 daemon 接上它——重启 daemon 时带上参数：
 
@@ -159,6 +160,91 @@ node daemon/codex-watchd.js --pair --pair-scope control ...   # 重新配
 反而掩盖了真实状态。所以自动重试只覆盖切网、锁屏这类瞬时抖动（3 次），
 之后停下来把决定权交给你。
 
+## 中继部署
+
+中继要能被手机和电脑同时够到。三个方案按省事程度排列，**都验证过**。
+
+### 方案一：Cloudflare 隧道（最省事，推荐先用这个）
+
+中继就跑在你自己的 Mac 上，用隧道把它暴露成公网 HTTPS 地址。
+**不需要服务器、不需要域名、不需要注册账号**，一条命令：
+
+```bash
+brew install cloudflared
+
+# 终端 A：中继（本机）
+node relay/server.js --port 8090 --secret <你的密钥>
+
+# 终端 B：隧道，会打印一个 https://xxx.trycloudflare.com 地址
+cloudflared tunnel --url http://127.0.0.1:8090
+```
+
+拿到地址后，把 `https://` 换成 `wss://` 用作中继地址：
+
+```bash
+node daemon/codex-watchd.js --relay wss://xxx.trycloudflare.com --relay-secret <你的密钥>
+node daemon/codex-watchd.js --pair --relay wss://xxx.trycloudflare.com \
+     --relay-secret <你的密钥> --pair-scope control
+```
+
+**隐私不受影响**：业务载荷是端到端加密的，Cloudflare 只能看到密文和连接元数据
+（谁在什么时候连了多久），和自建中继时它作为网络中间人能看到的一样多。
+
+**唯一的坑**：临时隧道的地址**每次重启都会变**，而配对串里嵌了中继地址，
+地址一变就得重新配对。适合先跑通、临时用。要长期用，走下面两个方案之一，
+或者用 Cloudflare 命名隧道（需要一个接入 Cloudflare 的域名，地址就固定了）。
+
+### 方案二：Fly.io（地址固定，仍然省事）
+
+仓库里已经备好 [`relay/Dockerfile`](relay/Dockerfile) 和 [`relay/fly.toml`](relay/fly.toml)：
+
+```bash
+cd relay
+fly launch --no-deploy --copy-config     # 选区域，确认 app 名
+fly secrets set RELAY_SECRET=<你的密钥>
+fly deploy
+```
+
+中继地址就是 `wss://<你的app名>.fly.dev`，固定不变，Fly 自动配好 TLS。
+
+`fly.toml` 里 `auto_stop_machines = false` 是**必须的**——中继是长连接，
+机器一自动停机，daemon 和手机就会被反复断开。
+
+### 方案三：自己的 VPS
+
+```bash
+# 服务器上
+node relay/server.js --port 8090 --secret <你的密钥>
+```
+
+然后用 Caddy / Nginx 反代并配 TLS（**必须**，否则配对串和流量走明文网络）。
+Caddy 只要两行：
+
+```
+relay.你的域名.com {
+    reverse_proxy 127.0.0.1:8090
+}
+```
+
+Caddy 默认就支持 WebSocket 升级，不用额外配置。用 Nginx 的话记得加
+`proxy_set_header Upgrade $http_upgrade;` 和 `proxy_set_header Connection "upgrade";`。
+
+### 三个方案怎么选
+
+| | 要服务器 | 地址固定 | 适合 |
+|---|---|---|---|
+| Cloudflare 隧道 | 不要 | ✗ 每次重启变 | 先跑通、临时用 |
+| Cloudflare 命名隧道 | 不要 | ✓ | 你已经有域名在 Cloudflare |
+| Fly.io | 不要（托管） | ✓ | **日常自用，推荐** |
+| 自己的 VPS | 要 | ✓ | 你本来就有服务器 |
+
+### 不管哪个方案，都记得
+
+- **一定要设 `--secret`**。没有它，任何人知道你的中继地址就能接入房间。
+  虽然读不了内容（端到端加密），但能耗你的资源、也能看到连接时序。
+- **一定要用 `wss://` 而不是 `ws://`**。方案一二自动就是；VPS 方案要自己配 TLS。
+- 中继**不需要**和 daemon 在同一台机器。方案一之所以放在本机，纯粹是图省事。
+
 ## 命令速查
 
 ```bash
@@ -176,6 +262,7 @@ node daemon/codex-watchd.js --revoke-device <id>
 
 # 中继
 node relay/server.js --port 8090 --secret <密钥>
+cloudflared tunnel --url http://127.0.0.1:8090       # 暴露成公网地址
 curl http://127.0.0.1:8090/health                    # 看房间与连接数
 ```
 
@@ -383,7 +470,7 @@ SSE 输出的每个事件形如：
 ## 还没做的
 
 - **真机运行**：只在模拟器验证过。需要你的签名 Team 和自己的 Bundle ID。
-- **中继正式部署**：现在跑在本机。手机出了家门要连，得部署到 VPS 或 Cloudflare（见 [docs/relay.md](docs/relay.md)）。
+- **中继长期地址**：临时隧道地址每次重启都变，长期用需要 Fly.io 或命名隧道（见 [中继部署](#中继部署)，配置文件已备好）。
 - **多台电脑**：所有接口隐含单机，家里+公司两台需要 hostId 维度。
 - `thread/resume` 一个**正被 Desktop 打开**的线程时，写锁行为未实测。
 
