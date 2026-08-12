@@ -295,6 +295,10 @@ scripts/install-launchd.sh
 本地中继和 cloudflared 从此不需要了，`scripts/start.sh` 检测到 `relay-url`
 也只会起 daemon。
 
+> 提醒：到这一步，自部署后台的全部功能就绪——**除了推送**。装官方分发的包时
+> 推送无法自配（APNs 凭证按开发者团队锁死，见 [docs/push.md](docs/push.md)
+> 的「推送的边界」）；要推送需从源码构建并使用自己的 Bundle ID 与 APNs 凭证。
+
 ### 三个方案怎么选
 
 | | 要服务器 | 地址固定 | 适合 |
