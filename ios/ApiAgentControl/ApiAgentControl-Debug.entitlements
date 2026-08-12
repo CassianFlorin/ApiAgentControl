@@ -2,6 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- 用 Xcode 直接装到手机上时走沙盒 APNs。
+	     daemon 侧 auth.json 的 apns.production 必须同为 false，否则收不到推送。 -->
 	<key>aps-environment</key>
 	<string>development</string>
 </dict>

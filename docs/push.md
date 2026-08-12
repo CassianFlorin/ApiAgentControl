@@ -68,8 +68,21 @@ Extension 和 App Group 权限，就已经是完全隐私的**——比"加密�
 
 daemon 启动时会打印 `推送 APNs 沙盒环境, bundle=...`；没配置则打印"未配置"并跳过。
 
-**`production` 别搞错**：Xcode 直接安装（development 签名）必须用 `false`；
-TestFlight / App Store 分发才是 `true`。用错会一直收到 `BadDeviceToken`。
+**`production` 必须与 App 的构建配置对上**，这是最容易静默失效的地方：
+
+| App 怎么装的 | 构建配置 | entitlements 的 `aps-environment` | auth.json 的 `production` |
+|---|---|---|---|
+| Xcode 直接装到手机 | Debug | `development` | `false` |
+| TestFlight | Release | `production` | **`true`** |
+| App Store | Release | `production` | `true` |
+
+**TestFlight 走的是 production APNs**，不是沙盒 —— 这点很反直觉，也是最常见的坑：
+用 development 的 entitlement 发 TestFlight，推送会**毫无提示地收不到**，
+既不报错也没有日志。
+
+工程里已经按配置拆成两份 entitlements（`ApiAgentControl-Debug.entitlements` /
+`ApiAgentControl-Release.entitlements`），你只需要保证 `auth.json` 里的
+`production` 跟着当前安装方式改。对不上时 APNs 返回 `BadDeviceToken`。
 
 ## 手机侧
 

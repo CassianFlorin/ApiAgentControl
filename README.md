@@ -152,7 +152,8 @@ node daemon/codex-watchd.js --pair --pair-scope control ...   # 重新配
 | 「配对凭证已失效」 | 设备被吊销了，或换了 Bundle ID。点「重新配对」按新配对串重配 |
 | 看不到某个会话 | 归档的会话默认不显示；子代理线程也不显示（跟随 Codex 自己的判定） |
 | 会话只显示一串 UUID | 该会话既没被命名、也没有可提取的用户消息，属正常 |
-| 推送收不到 | 检查 `auth.json` 里 apns 段的 `bundleId` 是否和工程一致；<br>Xcode 直接装的必须 `"production": false`，用错会一直 `BadDeviceToken` |
+| 推送收不到 | `auth.json` 的 `bundleId` 要和工程一致；`production` 要和安装方式一致 ——<br>Xcode 直装是 `false`，**TestFlight 是 `true`**（它走 production APNs，反直觉但确实如此）。<br>详见 [docs/push.md](docs/push.md) |
+| Xcode Cloud 的 export 步骤失败（exit 70） | Archive 成功而 export 失败＝签名问题，不是代码问题。<br>多半是 App ID 没注册、或没勾 Push Notifications 能力。见 [docs/push.md](docs/push.md) |
 | 手机上发不了指令 | 当前设备是 `read` 或 `approve` 档位，需要 `control` |
 
 **为什么不做无限自动重连**：它给人的是"看起来在恢复"的假象。

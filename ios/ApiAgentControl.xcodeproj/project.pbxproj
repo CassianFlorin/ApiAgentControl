@@ -31,6 +31,8 @@
 		C454DE087B3149FDA3951178 /* ApiAgentControlApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApiAgentControlApp.swift; sourceTree = "<group>"; };
 		DD7357EC93E74816935C6135 /* PushManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushManager.swift; sourceTree = "<group>"; };
 		E52DCD2039464C1392B9E406 /* Crypto.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Crypto.swift; sourceTree = "<group>"; };
+		21B955226F3B45F79CE35E95 /* ApiAgentControl-Debug.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ApiAgentControl-Debug.entitlements; sourceTree = "<group>"; };
+		5CBAEF92009248078894BB67 /* ApiAgentControl-Release.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ApiAgentControl-Release.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -63,6 +65,8 @@
 				DD7357EC93E74816935C6135 /* PushManager.swift */,
 				E4016F5D49504E3393DD9AAA /* Views */,
 				6B35DFA50BBC484BB188B9DE /* Assets.xcassets */,
+				21B955226F3B45F79CE35E95 /* ApiAgentControl-Debug.entitlements */,
+				5CBAEF92009248078894BB67 /* ApiAgentControl-Release.entitlements */,
 			);
 			path = ApiAgentControl;
 			sourceTree = "<group>";
@@ -189,7 +193,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = ApiAgentControl/ApiAgentControl.entitlements;
+				CODE_SIGN_ENTITLEMENTS = ApiAgentControl/ApiAgentControl-Debug.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = HU729D6ML5;
@@ -232,7 +236,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = ApiAgentControl/ApiAgentControl.entitlements;
+				CODE_SIGN_ENTITLEMENTS = ApiAgentControl/ApiAgentControl-Release.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = HU729D6ML5;
