@@ -308,14 +308,16 @@ scripts/install-launchd.sh
 控制通道就不就绪、多久没有新事件——不用再开终端敲 `launchctl` 或 `tail` 日志。
 
 ```bash
-macos/build.sh
-open "macos/build/ApiAgentControl Monitor.app"
+macos/build.sh --install
 ```
+
+一条命令构建 + 装进「应用程序」+ 启动，之后就是个可以双击的普通 App
+（图标复用 iOS 那张，转成 macOS 风格的留白 + 圆角）。
 
 菜单栏图标本身就是状态：`))` 正常、`⚠` 有环节不通、`))/` 已停止。
 面板里能看日志尾巴、一键重启、打开调试页。
-常用的话 `cp -R "macos/build/ApiAgentControl Monitor.app" /Applications/`，
-再到 **系统设置 → 通用 → 登录项** 添加它即可开机常驻。
+开机常驻：**系统设置 → 通用 → 登录项 → ＋** 添加它。
+不加 `--install` 就只构建到 `macos/build/`，不动「应用程序」。
 
 状态数据来自 daemon 的 `/status` 端点（只监听 `127.0.0.1`，鉴权复用本机 token）。
 开关走 `launchctl bootout` / `bootstrap`——**不是 kill**，因为 launchd 的
