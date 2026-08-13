@@ -170,8 +170,11 @@ class AppServerClient {
       // 原始报错是英文内部术语（thread-store conflict: already has an active
       // writer），直接透给手机等于没提示。
       if (/active writer|thread-store conflict/i.test(e.message || '')) {
+        // 注意措辞：Codex Desktop 打开过的线程会一直持有到**它自己退出**为止，
+        // 在界面里切走／关掉标签都不释放（协议没有 unload，见 docs/control-protocol.md）。
+        // 早先提示"在 Desktop 里离开该会话后重试"是错的，照做没有任何效果。
         throw Object.assign(
-          new Error('该会话已被另一处打开（多半是电脑上的 Codex Desktop）。同一会话同时只能有一方操作：请直接在电脑上继续，或在 Desktop 里离开该会话后重试。'),
+          new Error('该会话被电脑上的 Codex Desktop 占用。Desktop 打开过的会话会一直占用到它退出为止（在界面里切走没用）：请在电脑上退出 Codex Desktop（⌘Q）后重试，或直接在电脑上继续这条会话。'),
           { status: 409 }
         );
       }
@@ -322,6 +325,11 @@ class ControlChannel {
 
   /** 当前持有写锁的线程数（/status 用，便于判断有没有占着 Desktop） */
   get heldThreads() { return this.turns.size; }
+
+  /** 一次性实例的进程号。用来把"我们自己占着"和"Desktop 占着"区分开 */
+  turnPids() {
+    return [...this.turns.values()].map(e => e.client?.proc?.pid).filter(Boolean);
+  }
 
   /**
    * 取得某线程的一次性实例；没有就现起一个。

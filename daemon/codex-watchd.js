@@ -29,6 +29,7 @@ const http = require('http');
 const os = require('os');
 const crypto = require('crypto');
 const { ControlChannel } = require('./appserver');
+const threadLocks = require('./thread-locks');
 const { Auth, SCOPES, AUTH_FILE } = require('./auth');
 const { RelayConnector, generateKeyPair } = require('./relay-client');
 const { DesktopState } = require('./desktop-state');
@@ -993,6 +994,23 @@ function sendJson(res, status, obj) {
   res.end(JSON.stringify(obj, null, 2));
 }
 
+/**
+ * 给会话列表补上「谁占着写锁」。
+ *
+ * 手机据此提前禁用输入框并说明原因 —— 否则用户打完一长段字才吃 409，
+ * 而这个 409 多半还改不了（Desktop 打开过的会话要它退出才放锁）。
+ * 自己占着（`self`，正在跑手机发起的 turn）不该拦，转瞬即释。
+ */
+async function withLockState(list) {
+  let cls;
+  try {
+    const map = await threadLocks.scan();
+    const ownPids = [ctl?.proc?.pid, ...(ctl?.turnPids?.() || [])];
+    cls = threadLocks.classifier(map, ownPids);
+  } catch { return list; }          // 探测失败就当没这回事，别影响列表本身
+  return list.map(s => ({ ...s, ...cls(s.id) }));
+}
+
 async function handleControl(req, res, url) {
   const seg = url.pathname.split('/').filter(Boolean); // e.g. ['threads', ':id', 'turns']
   // 只接管控制类路径，其余交回主路由（否则 --no-control 会把只读接口也吞掉）
@@ -1458,7 +1476,7 @@ function startServer() {
       list = list
         .sort((a, b) => String(b.lastActivity || b.updatedAt || '').localeCompare(String(a.lastActivity || a.updatedAt || '')))
         .slice(0, Number(url.searchParams.get('limit') || 100));
-      sendJson(res, 200, list);
+      sendJson(res, 200, await withLockState(list));
     } else if (url.pathname.startsWith('/sessions/') && url.pathname.endsWith('/history')) {
       // 会话历史回填：手机上点进会话要能往上翻，而不是只看得到订阅之后的新事件。
       // before 为字节偏移游标（省略则取最新一页），返回按时间正序。
@@ -1484,14 +1502,16 @@ function startServer() {
       const withSub = url.searchParams.get('subagent') === '1';
       const pinnedSet = new Set(desktop.pinnedOrder);
       await refreshVisibleThreads();
-      const visible = [];
+      const raw = [];
       for (const s of sessions.values()) {
         if (s.archived && !withArchived) continue;   // 归档的不进首页
         if (!withSub && !visibilityAllows(s, pinnedSet)) continue;
         const r = recencyOf(s);
         if (cutoff && (!r || Date.parse(r) < cutoff)) continue;
-        visible.push(s);
+        raw.push(s);
       }
+      // 首页也要标出「电脑占着、发不了」，否则用户点进去才发现
+      const visible = await withLockState(raw);
 
       const tally = list => ({
         // 「需要我处理」= 等审批 + 等回文字，两者都是卡住在等人

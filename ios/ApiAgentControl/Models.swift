@@ -66,6 +66,17 @@ struct Session: Codable, Identifiable, Equatable {
     /// signal = 协议给出的确定信号；inferred = 从最后一句话推断出来的
     var waitingReason: String?
 
+    /// 会话的写锁被谁占着。Codex 同一会话只允许一个写入方，
+    /// 被电脑上的 Desktop 占着时手机发不了指令 —— 提前告诉用户，
+    /// 而不是等他打完一长段字才吃 409。
+    var locked: Bool?
+    /// `self` = 本 daemon 正在跑手机发起的任务（转瞬即释，不用拦）
+    /// `other` = 电脑上的 Codex Desktop 占着
+    var lockedBy: String?
+
+    /// 手机现在能不能往这条会话发指令
+    var blockedByDesktop: Bool { locked == true && lockedBy == "other" }
+
     var displayTitle: String { title ?? String(id.suffix(8)) }
     var state: SessionState { SessionState(rawValue: status ?? "idle") ?? .idle }
     var recency: String { lastActivity ?? updatedAt ?? "" }

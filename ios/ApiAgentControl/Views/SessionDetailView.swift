@@ -114,8 +114,29 @@ struct SessionDetailView: View {
         }
     }
 
+    /// 这条会话是否正被电脑上的 Desktop 占着（列表数据里带来的状态）
+    private var blockedByDesktop: Bool {
+        app.sessions[sessionId]?.blockedByDesktop ?? false
+    }
+
     @ViewBuilder private var composer: some View {
-        if app.scope.canControl {
+        if app.scope.canControl && blockedByDesktop {
+            // 拦在输入之前。此前是打完一长段字、点了发送才吃 409，
+            // 而这个 409 当场还改不了 —— Desktop 打开过的会话要它退出才放锁。
+            HStack(alignment: .top, spacing: 8) {
+                Image(systemName: "lock.laptopcomputer").foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("这条会话正被电脑上的 Codex Desktop 占用")
+                        .font(.caption.weight(.medium))
+                    Text("同一会话同时只能有一方操作。Desktop 打开过的会话会一直占用到它退出为止（在界面里切走没用）——请在电脑上退出 Codex Desktop，或直接在电脑上继续。")
+                        .font(.caption2).foregroundStyle(.secondary)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(10)
+            .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 10))
+            .padding(.horizontal).padding(.vertical, 8)
+        } else if app.scope.canControl {
             VStack(spacing: 4) {
                 // 发送失败必须显示在手边，而不是只在首页横幅 ——
                 // 人在这个页面里发的，错误就得在这个页面里看见

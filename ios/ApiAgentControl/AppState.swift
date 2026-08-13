@@ -149,9 +149,18 @@ final class AppState: ObservableObject {
             authFailed = false
 
             let groups = try await relay.get("/projects?days=30", as: [ProjectGroup].self)
-            // 服务端的会话数据是快照；本地事件流可能更新，合并时不要覆盖已有的实时状态
+            // 服务端的会话数据是快照；本地事件流可能更新，合并时不要覆盖已有的实时状态。
+            // 但**写锁状态是动态的**（电脑上退出 Desktop 就释放），只能来自服务端，
+            // 所以已存在的会话也要把这两个字段刷新掉 —— 否则第一次加载后永远不变。
             for g in groups {
-                for s in g.sessions where sessions[s.id] == nil { sessions[s.id] = s }
+                for s in g.sessions {
+                    if sessions[s.id] == nil {
+                        sessions[s.id] = s
+                    } else {
+                        sessions[s.id]?.locked = s.locked
+                        sessions[s.id]?.lockedBy = s.lockedBy
+                    }
+                }
             }
             projects = groups
             rebuildProjects()

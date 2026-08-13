@@ -162,6 +162,12 @@ struct SessionRow: View {
                 Text(session.displayTitle)
                     .font(.subheadline.weight(.medium))
                     .lineLimit(1)
+                // 电脑占着写锁时手机发不出指令，列表上先标出来
+                if session.blockedByDesktop {
+                    Image(systemName: "lock.laptopcomputer")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
                 Spacer()
                 if let n = session.unread, n > 0 {
                     Text("\(n)")
