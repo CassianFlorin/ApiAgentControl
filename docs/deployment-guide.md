@@ -46,7 +46,9 @@ qrencode -t ANSIUTF8 "<打印出来的 apiagentcontrol://pair?d=... 串>"
 > 配对串里嵌着中继地址，隧道重启后手机要重新配对。适合先跑通体验；
 > 长期使用请升级到方案 B。
 
-停止：`scripts/stop.sh`。日志在 `~/.codex-watchd/*.log`。
+停止：`scripts/stop.sh`。日志在 `~/.codex-watchd/*.log`，daemon 自己轮转
+（单文件超 2MB 原地截断，留末尾 256KB），不用另配 logrotate；后台运行时
+只记审批和错误，会话正文不落盘（要全量加 `--verbose`）。
 
 ## 方案 B：VPS 固定中继（长期使用推荐）
 

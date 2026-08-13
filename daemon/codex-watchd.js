@@ -35,6 +35,7 @@ const { RelayConnector, generateKeyPair } = require('./relay-client');
 const { DesktopState } = require('./desktop-state');
 const { describeApproval } = require('./approvals');
 const { PushSender, pushableEvent } = require('./push');
+const { startLogRotation } = require('./log-rotate');
 
 // ---------- CLI ----------
 
@@ -348,7 +349,22 @@ function label(ev) {
   return (s && s.title) || (ev.session_id ? ev.session_id.slice(-8) : '????????');
 }
 
+/**
+ * 落盘时只记这几类。
+ *
+ * 前台跑（stdout 是 TTY）时逐条打事件是这个 daemon 最好用的地方；但被 launchd
+ * 接管后同样的输出会**永久堆在 daemon.log 里** —— 实测一天 2.9MB，且内容是
+ * 完整的推理、回复、命令和命令输出。既是无界增长，也让端到端加密在本机破了个口子：
+ * 手机那侧再怎么加密，明文全文照样躺在磁盘上。
+ *
+ * 所以非 TTY 场景默认只留审批和错误（这两类是事后真正要查的），正文一概不落盘。
+ * 想要全量：--verbose。
+ */
+const LOGGED_KINDS_TO_FILE = new Set(['approval_request', 'approval_resolved', 'ctl_error', 'error']);
+const LOG_ALL_EVENTS = VERBOSE || process.stdout.isTTY;
+
 function logEvent(ev) {
+  if (!LOG_ALL_EVENTS && !LOGGED_KINDS_TO_FILE.has(ev.kind)) return;
   const [color = '', icon = '·'] = KIND_STYLE[ev.kind] || [];
   const time = (ev.ts || '').slice(11, 19);
   const text = ev.text ?? ev.name ?? ev.output ?? ev.method ?? ev.model ?? ev.cwd ?? '';
@@ -1612,7 +1628,15 @@ function startServer() {
   for (const h of ALLOW_HOSTS) auth.bindHosts.add(h);
   auth.port = PORT;
 
+  // 这个进程是常驻的那个，~/.codex-watchd/*.log 的收尾只能由它做
+  startLogRotation(path.dirname(AUTH_FILE), {
+    onRotate: n => console.log(`${C.dim}日志轮转: ${n} 个文件已截断${C.reset}`),
+  });
+
   console.log(`${C.bold}codex-watchd${C.reset} watching ${CODEX_HOME}`);
+  if (!LOG_ALL_EVENTS) {
+    console.log(`${C.dim}事件正文不落盘（只记审批和错误）；要看全量: --verbose 或前台运行${C.reset}`);
+  }
   desktop.reload();
   if (desktop.available) {
     console.log(`${C.dim}Desktop 侧栏: ${desktop.projects.length} 个项目, ${desktop.pinnedOrder.length} 条置顶${C.reset}`);

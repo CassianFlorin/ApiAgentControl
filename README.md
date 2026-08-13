@@ -59,7 +59,8 @@ scripts/start.sh
 顺序拉起三件套：中继（:8090）→ daemon（:8787）→ Cloudflare 隧道（公网 wss 地址），
 并打印配对命令。可重复执行——已在跑的组件自动跳过，不会起第二份。
 准入密钥首次运行自动生成（`~/.codex-watchd/relay-secret`），
-日志在 `~/.codex-watchd/{relay,daemon,tunnel}.log`。停止：
+日志在 `~/.codex-watchd/{relay,daemon,tunnel}.log`——daemon 会自己收尾，
+单个文件超过 2MB 就原地截断只留末尾 256KB，不需要配 logrotate。停止：
 
 ```bash
 scripts/stop.sh
@@ -451,7 +452,10 @@ node daemon/codex-watchd.js [--home ~/.codex] [--port 8787] [--bind 127.0.0.1]
 
 启动后：
 
-- **stdout**：人类可读的彩色实时日志
+- **stdout**：人类可读的彩色实时日志。**前台运行**（stdout 是 TTY）时逐条打事件；
+  被 launchd / `nohup` 接管、输出重定向进文件时只记审批和错误，正文不落盘——
+  否则一天就是几 MB 的完整推理和命令输出，既无界增长，也等于在本机留了份明文全文。
+  要在后台也看全量：加 `--verbose`
 - **`http://127.0.0.1:8787/`**：浏览器调试页（左侧项目/会话树 + 审批按钮，右侧实时流）
 - **`GET /events`**：SSE 事件流。支持 `?session=<id>` 只订阅单个会话、
   `?kinds=a,b,c` 按类型降噪、`?replay=N` 回放最近 N 条
