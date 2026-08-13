@@ -16,13 +16,31 @@ final class AppState: ObservableObject {
     let relay = RelayClient()
     let push = PushManager()
 
+    /// 待上报的 APNs token。系统回调通常在启动后 1 秒内就来，
+    /// 而中继握手要更久 —— 此前连接没就绪就直接丢弃且不重试，
+    /// 结果是 token 常年报不上去（真机上表现为：换了配对之后推送仍打到旧设备记录，
+    /// 而旧记录的 peerKey 早已失效，推送因此加不了密）。现在存下来等连上再报。
+    private var pendingPushToken: String?
+
     /// 把 APNs device token 交给 daemon。同时带上本机的中继公钥，
     /// 因为推送内容要用与这台设备协商的会话密钥加密。
+    ///
+    /// 公钥每次连接都会重新生成，所以**每次连上都要重报一次**，
+    /// 否则 daemon 手里的 peerKey 是上一次会话的，加密会失败。
     func registerPushToken(_ token: String) async {
-        guard relay.state.isUsable else { return }
+        pendingPushToken = token
+        await flushPushToken()
+    }
+
+    private func flushPushToken() async {
+        guard let token = pendingPushToken, relay.state.isUsable else { return }
         var body: [String: Any] = ["token": token]
         if let pk = relay.myPublicKey { body["peerKey"] = pk }
-        _ = try? await relay.request("POST", "/devices/push-token", body: body)
+        do {
+            _ = try await relay.request("POST", "/devices/push-token", body: body)
+        } catch {
+            return          // 保留 pendingPushToken，下次连上再试
+        }
     }
 
     /// 服务端确认的当前档位。配对串里的只是**配对那一刻的快照** ——
@@ -74,12 +92,16 @@ final class AppState: ObservableObject {
             .sink { [weak self] in self?.objectWillChange.send() }
             .store(in: &cancellables)
 
-        // 连接可用时自动拉一次数据，否则要等用户手动下拉
+        // 连接可用时自动拉一次数据，否则要等用户手动下拉。
+        // 顺带把待上报的推送 token 补交上去 —— 它的公钥来自本次连接，必须每次重报。
         relay.$state
             .removeDuplicates()
             .sink { [weak self] st in
                 guard st.isUsable else { return }
-                Task { await self?.refresh() }
+                Task {
+                    await self?.refresh()
+                    await self?.flushPushToken()
+                }
             }
             .store(in: &cancellables)
 

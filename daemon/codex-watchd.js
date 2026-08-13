@@ -1170,17 +1170,26 @@ function maybePush(ev) {
 
   for (const dev of auth.devices) {
     if (!dev.pushToken) continue;
-    // 与该设备协商过的密钥用于加密推送内容；没协商过就只发占位
+    // 与该设备协商过的密钥用于加密推送内容。协商密钥在内存里，且手机每次启动
+    // 都换一对临时密钥 —— 所以"拿不到密钥"是常态而非异常：daemon 刚重启、
+    // 或设备记录里的 peerKey 已过期，都会落到这里。
     const key = relay.peers.get(dev.peerKey);
     const sealed = key ? relay.sealFor(dev.peerKey, {
       title: info.title, body: info.body, subtitle: info.subtitle,
       sessionId: ev.session_id, reason: info.reason,
     }) : null;
 
+    if (!sealed && VERBOSE) {
+      console.log(`${C.dim}[push] 设备 ${dev.id} 尚未协商密钥，本条只发占位${C.reset}`);
+    }
+
     push.send(dev.pushToken, {
-      // 明文占位：APNs 看得到，所以不能带真实内容
-      title: sealed ? '有一条需要处理' : info.title,
-      body: sealed ? '打开查看' : info.body,
+      // 明文部分恒为占位。加不了密就只发占位、不降级成明文正文 ——
+      // 此前这里在 sealed 为空时回落到真实的 title/body，等于把命令内容
+      // 明文交给 APNs，与「通知不含任何会话信息」的承诺相反。
+      // 内容取不回来是小事（打开 App 就能看），泄漏出去是不可逆的。
+      title: '有一条需要处理',
+      body: '打开查看',
       ciphertext: sealed,
       threadId: ev.session_id,
       collapseId: info.collapseId,
