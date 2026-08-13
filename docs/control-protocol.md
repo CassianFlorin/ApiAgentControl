@@ -87,3 +87,33 @@ daemon 对外统一暴露 `allow` / `allow_always` / `deny` / `abort`，内部�
 2. **app-server 子进程**（本文档验证）—— 新建/续接线程、发指令、打断、审批
 
 两通道天然互补：watcher 覆盖"别人发起的会话"（Desktop 里人工开的），app-server 覆盖"App 发起的控制"。
+
+## 写锁：同一线程只允许一个写入方
+
+`thread/resume` 会让调用方成为该线程的 **active writer**，别人再 resume 就报
+`thread-store conflict: already has an active writer`。这是 Codex 的硬约束，
+Desktop 与本 daemon 谁先拿到算谁的。
+
+**关键事实：协议里没有任何 close / unload 方法，进程退出是唯一的释放手段。**
+实测（两个独立 app-server，A 先持有）：
+
+| 操作 | 结果 |
+|---|---|
+| B `thread/resume` | ✗ already has an active writer |
+| A `thread/unsubscribe` | ✓ 返回 `unsubscribed` |
+| A unsubscribe 后查 `thread/loaded/list` | **线程仍在已加载列表里** |
+| A unsubscribe 后 B `thread/resume` | ✗ **仍然冲突** |
+| 杀掉 A 进程后 B `thread/resume` | ✓ |
+
+也就是说 `unsubscribe` 只停事件推送，不放锁。曾据其语义误以为能释放，结果是：
+手机发过一次指令后该线程被 daemon 永久占住，Desktop 打不开；
+而手机自己再发第二次也会失败——撞上的是**上一次自己留下的锁**。
+
+因此控制通道拆成两层（[daemon/appserver.js](../daemon/appserver.js)）：
+
+- **常驻实例**只做无锁操作（`thread/list`），永不 resume；
+- 每次发指令为该线程起一个**一次性实例**，`turn/completed` 后留 3 秒余量
+  （等紧随其后的 `thread/status/changed`，`waitingOnUserInput` 在里面），
+  然后杀掉进程把锁还回去。
+
+代价是每次发指令多几百毫秒的进程启动，只在人主动操作时发生。

@@ -28,7 +28,7 @@ const path = require('path');
 const http = require('http');
 const os = require('os');
 const crypto = require('crypto');
-const { AppServerClient } = require('./appserver');
+const { ControlChannel } = require('./appserver');
 const { Auth, SCOPES, AUTH_FILE } = require('./auth');
 const { RelayConnector, generateKeyPair } = require('./relay-client');
 const { DesktopState } = require('./desktop-state');
@@ -891,7 +891,7 @@ const SERVER_REQUEST_KINDS = new Set([
 
 
 function startControl() {
-  ctl = new AppServerClient({
+  ctl = new ControlChannel({
     log: m => VERBOSE && console.log(`${C.dim}[ctl] ${m}${C.reset}`),
     onServerRequest(method, params, respond) {
       if (!SERVER_REQUEST_KINDS.has(method)) {
@@ -1411,7 +1411,7 @@ function startServer() {
           pairedPeers: relay.peers.size,
         } : { configured: false, connected: false },
         // 控制通道可能因为找不到 codex 而起不来，此时监听仍正常——必须分开报
-        control: { enabled: !!ctl, appServerUp: !!ctl?.proc },
+        control: { enabled: !!ctl, appServerUp: !!ctl?.proc, heldThreads: ctl?.heldThreads ?? 0 },
         push: push
           ? { configured: true, production: !!cfg?.production, bundleId: cfg?.bundleId,
               devicesWithToken: auth.devices.filter(d => d.pushToken).length }

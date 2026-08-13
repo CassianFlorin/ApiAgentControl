@@ -22,16 +22,17 @@ class AppServerClient {
    * @param {(method: string, params: any) => void} [opts.onNotification]
    * @param {(msg: string) => void} [opts.log]
    */
-  constructor({ onServerRequest, onNotification, log } = {}) {
+  constructor({ onServerRequest, onNotification, onTurnDone, log, autoRestart = true } = {}) {
     this.onServerRequest = onServerRequest || (() => {});
     this.onNotification = onNotification || (() => {});
+    this.onTurnDone = onTurnDone || (() => {});
     this.log = log || (() => {});
+    this.autoRestart = autoRestart;   // 一次性实例退出后不该被拉起来
     this.proc = null;
     this.nextId = 1;
     this.pending = new Map();      // id -> {resolve, reject, timer}
     this.resumed = new Set();      // 本实例已加载的 threadId
     this.activeTurns = new Map();  // threadId -> turnId
-    this.releaseTimers = new Map(); // threadId -> 定时器（延迟释放）
     this.buf = '';
     this.ready = null;             // Promise，initialize 完成
     this.stopped = false;
@@ -62,10 +63,8 @@ class AppServerClient {
       this.pending.clear();
       this.resumed.clear();
       this.activeTurns.clear();
-      for (const t of this.releaseTimers.values()) clearTimeout(t);
-      this.releaseTimers.clear();
       this.ready = null;
-      if (!this.stopped) {
+      if (!this.stopped && this.autoRestart) {
         setTimeout(() => { this.backoff = Math.min(this.backoff * 2, 30_000); this.start(); }, this.backoff);
       }
     });
@@ -149,57 +148,30 @@ class AppServerClient {
   _trackTurns(method, params = {}) {
     if (method === 'turn/started' && params.threadId && params.turn?.id) {
       this.activeTurns.set(params.threadId, params.turn.id);
-      // 新 turn 开始，取消尚未执行的释放
-      clearTimeout(this.releaseTimers.get(params.threadId));
-      this.releaseTimers.delete(params.threadId);
     }
-    if ((method === 'turn/completed' || method === 'turn/failed' || method === 'turn/aborted') && params.threadId) {
+    if (method === 'turn/completed' && params.threadId) {
       this.activeTurns.delete(params.threadId);
-      this._scheduleRelease(params.threadId);
+      this.onTurnDone(params.threadId);
     }
   }
 
-  /**
-   * turn 结束后把线程还给 Desktop。
-   *
-   * thread/resume 会让本进程持有该线程的 rollout —— Desktop 那边直接显示
-   * 「此任务正在其他位置运行」，用户在电脑上没法继续用。所以持锁窗口必须
-   * 压缩到「只在跑任务时」：turn 一结束就 thread/unsubscribe 释放，
-   * 下次手机再发指令由 ensureResumed 重新加载，代价只是一次 resume 的延迟。
-   *
-   * 延迟几秒再释放：turn/completed 之后紧跟的 thread/status/changed
-   * （waitingOnUserInput 就在里面）还得收到；立刻退订就把它丢了。
-   */
-  _scheduleRelease(threadId) {
-    if (!this.resumed.has(threadId)) return;
-    clearTimeout(this.releaseTimers.get(threadId));
-    this.releaseTimers.set(threadId, setTimeout(() => {
-      this.releaseTimers.delete(threadId);
-      if (this.activeTurns.has(threadId)) return;   // 已有新 turn，保持订阅
-      this.rpc('thread/unsubscribe', { threadId })
-        .then(r => { this.resumed.delete(threadId); this.log(`已释放线程 ${threadId} (${r?.status})`); })
-        .catch(e => this.log(`释放线程 ${threadId} 失败: ${e.message}`));
-    }, 3000));
-  }
+  /** 本实例当前是否还持有任何线程（决定能不能安全退出） */
+  get holdsAnyThread() { return this.resumed.size > 0; }
 
   // ---------- 高层操作 ----------
 
   async ensureResumed(threadId) {
     await this.ready;
-    // 有待执行的释放先取消，否则可能在 turn/start 发出后、turn/started 通知
-    // 到达前触发退订，把刚开始的 turn 的事件全丢掉
-    clearTimeout(this.releaseTimers.get(threadId));
-    this.releaseTimers.delete(threadId);
     if (this.resumed.has(threadId)) return;
     try {
       await this.rpc('thread/resume', { threadId });
     } catch (e) {
-      // Codex 的硬约束：同一线程同时只允许一个写入方。Desktop 正打开着这个
-      // 会话时 resume 必然失败，原始报错是英文内部术语（thread-store conflict:
-      // already has an active writer），直接透给手机等于没提示。
+      // Codex 的硬约束：同一线程同时只允许一个写入方。
+      // 原始报错是英文内部术语（thread-store conflict: already has an active
+      // writer），直接透给手机等于没提示。
       if (/active writer|thread-store conflict/i.test(e.message || '')) {
         throw Object.assign(
-          new Error('该会话正在电脑上的 Codex Desktop 中打开。同一会话同时只能有一方操作：请直接在电脑上继续，或在 Desktop 里离开该会话后重试。'),
+          new Error('该会话已被另一处打开（多半是电脑上的 Codex Desktop）。同一会话同时只能有一方操作：请直接在电脑上继续，或在 Desktop 里离开该会话后重试。'),
           { status: 409 }
         );
       }
@@ -293,4 +265,140 @@ class AppServerClient {
   }
 }
 
-module.exports = { AppServerClient };
+/**
+ * 控制通道。
+ *
+ * ## 为什么要分成"一个常驻 + 每线程一次性"
+ *
+ * `thread/resume` 会让本进程成为该线程的 **active writer**，而 Codex 同一线程
+ * 只允许一个写入方。实测（探针见 git 历史）：
+ *
+ * | 操作 | 结果 |
+ * |---|---|
+ * | A resume → B resume | B 报 already has an active writer |
+ * | A `thread/unsubscribe` | 返回 `unsubscribed`，但线程**仍在 `thread/loaded/list` 里** |
+ * | A unsubscribe 后 B resume | **仍然冲突** —— 退订只停事件推送，不放锁 |
+ * | 杀掉 A 进程后 B resume | 成功 |
+ *
+ * 协议里没有任何 close / unload 方法，**进程退出是唯一的释放手段**。
+ *
+ * 所以：
+ *   - **常驻实例**只做无锁操作（thread/list），永远不 resume；
+ *   - 手机每次发指令，为该线程起一个**一次性实例**，turn 跑完就杀掉进程。
+ *
+ * 此前误以为 unsubscribe 能放锁，导致：手机发过一次指令后该线程就被 daemon
+ * 永久占住，Desktop 打不开（报"正在其他位置运行"）；而手机自己再发一次也会
+ * 失败 —— resume 撞上的是**我们自己**上一次留下的锁，错误信息却在甩锅 Desktop。
+ */
+class ControlChannel {
+  constructor({ onServerRequest, onNotification, log } = {}) {
+    this.handlers = { onServerRequest, onNotification, log };
+    this.log = log || (() => {});
+    /** threadId -> { client, killTimer } —— 正在跑 turn 的一次性实例 */
+    this.turns = new Map();
+    this.main = new AppServerClient({ onServerRequest, onNotification, log });
+  }
+
+  /** turn 跑完到杀进程之间留的余量：turn/completed 之后紧跟的
+   *  thread/status/changed（waitingOnUserInput 在里面）还得收到 */
+  static GRACE_MS = 3000;
+
+  start() { return this.main.start(); }
+  get ready() { return this.main.ready; }
+  get proc() { return this.main.proc; }
+
+  stop() {
+    this.main.stop();
+    for (const { client, killTimer } of this.turns.values()) {
+      clearTimeout(killTimer);
+      client.stop();
+    }
+    this.turns.clear();
+  }
+
+  // --- 无锁操作走常驻实例 ---
+  listThreads(params) { return this.main.listThreads(params); }
+  listVisibleThreadIds(opts) { return this.main.listVisibleThreadIds(opts); }
+
+  /** 当前持有写锁的线程数（/status 用，便于判断有没有占着 Desktop） */
+  get heldThreads() { return this.turns.size; }
+
+  /**
+   * 取得某线程的一次性实例；没有就现起一个。
+   * 起一个 app-server 约几百毫秒，只在手机主动发指令时发生，可以接受。
+   */
+  async _clientFor(threadId) {
+    const existing = this.turns.get(threadId);
+    if (existing) {
+      clearTimeout(existing.killTimer);      // 有新动作，取消待执行的回收
+      existing.killTimer = null;
+      return existing.client;
+    }
+    const entry = { client: null, killTimer: null };
+    entry.client = new AppServerClient({
+      ...this.handlers,
+      autoRestart: false,                    // 一次性实例退出就是退出，别拉起来
+      onTurnDone: (tid) => this._scheduleKill(tid),
+    });
+    this.turns.set(threadId, entry);
+    entry.client.start();
+    await entry.client.ready;
+    return entry.client;
+  }
+
+  /** turn 结束 → 延迟杀进程，把线程还给 Desktop */
+  _scheduleKill(threadId) {
+    const entry = this.turns.get(threadId);
+    if (!entry || entry.killTimer) return;
+    entry.killTimer = setTimeout(() => {
+      // 期间又起了新 turn 就不动它
+      if (entry.client.activeTurns.size > 0) { entry.killTimer = null; return; }
+      entry.client.stop();
+      this.turns.delete(threadId);
+      this.log(`已释放线程 ${threadId}（一次性 app-server 退出）`);
+    }, ControlChannel.GRACE_MS);
+  }
+
+  async startThread(params) {
+    // 新建线程同样要独占，交给一次性实例；先建再登记
+    const client = new AppServerClient({ ...this.handlers, autoRestart: false,
+      onTurnDone: (tid) => this._scheduleKill(tid) });
+    client.start();
+    await client.ready;
+    const res = await client.startThread(params);
+    const id = res?.thread?.id;
+    if (id) this.turns.set(id, { client, killTimer: null });
+    else client.stop();
+    return res;
+  }
+
+  async startTurn(threadId, text, extra) {
+    const client = await this._clientFor(threadId);
+    try {
+      return await client.startTurn(threadId, text, extra);
+    } catch (e) {
+      // resume 失败（多半是 Desktop 占着）时别把空实例留在表里
+      if (!client.holdsAnyThread) {
+        client.stop();
+        this.turns.delete(threadId);
+      }
+      throw e;
+    }
+  }
+
+  async interruptTurn(threadId) {
+    // 只有我们自己发起的 turn 才可能被打断：turn 跑在我们的一次性实例里。
+    // 没有这个实例，就说明当前没有由本 daemon 发起的任务。
+    const entry = this.turns.get(threadId);
+    if (!entry) throw Object.assign(new Error('该会话当前没有由手机发起的进行中任务'), { status: 409 });
+    return entry.client.interruptTurn(threadId);
+  }
+
+  async steerTurn(threadId, text) {
+    const entry = this.turns.get(threadId);
+    if (!entry) throw Object.assign(new Error('该会话当前没有由手机发起的进行中任务'), { status: 409 });
+    return entry.client.steerTurn(threadId, text);
+  }
+}
+
+module.exports = { AppServerClient, ControlChannel };
