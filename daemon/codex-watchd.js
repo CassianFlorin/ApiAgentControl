@@ -374,8 +374,12 @@ function broadcast(ev) {
   }
 }
 
+/** 最近一次事件时刻。菜单栏 App 用它判断"在监听但很久没动静"还是"真的卡住了"。 */
+let lastEventAt = null;
+
 function emit(ev) {
   if (!ev) return;
+  lastEventAt = Date.now();
   applyEventToSession(ev);
   logEvent(ev);
   broadcast(ev);
@@ -1372,6 +1376,39 @@ function startServer() {
       if (!s) return sendJson(res, 404, { error: 'session not found' });
       s.unread = 0;
       return sendJson(res, 200, { ok: true });
+    }
+
+    // 运行状态汇总。给菜单栏 App（macos/）用：一次请求拿到"该不该亮绿灯"的全部依据。
+    // 单独做一个端点而不是让 App 去翻日志——日志是人读的，格式随时会变。
+    if (url.pathname === '/status') {
+      const cfg = auth.raw?.apns;
+      return sendJson(res, 200, {
+        ok: true,
+        pid: process.pid,
+        uptimeSec: Math.round(process.uptime()),
+        port: PORT,
+        watch: {
+          sessions: sessions.size,
+          trackedFiles: tails.size,
+          bufferedEvents: ring.length,
+          lastEventAt: lastEventAt ? new Date(lastEventAt).toISOString() : null,
+          sseClients: sseClients.size,
+        },
+        relay: relay ? {
+          configured: true,
+          connected: relay.connected,
+          url: relay.relayUrl,
+          room: relay.roomId,
+          pairedPeers: relay.peers.size,
+        } : { configured: false, connected: false },
+        // 控制通道可能因为找不到 codex 而起不来，此时监听仍正常——必须分开报
+        control: { enabled: !!ctl, appServerUp: !!ctl?.proc },
+        push: push
+          ? { configured: true, production: !!cfg?.production, bundleId: cfg?.bundleId,
+              devicesWithToken: auth.devices.filter(d => d.pushToken).length }
+          : { configured: false },
+        devices: auth.devices.length,
+      });
     }
 
     if (url.pathname === '/me') {

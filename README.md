@@ -302,6 +302,26 @@ scripts/install-launchd.sh
 > 推送无法自配（APNs 凭证按开发者团队锁死，见 [docs/push.md](docs/push.md)
 > 的「推送的边界」）；要推送需从源码构建并使用自己的 Bundle ID 与 APNs 凭证。
 
+### 菜单栏开关（不想记命令的话）
+
+`macos/` 下有个菜单栏 App：一个开关控制 daemon 起停，面板里直接看到中继连没连、
+控制通道就不就绪、多久没有新事件——不用再开终端敲 `launchctl` 或 `tail` 日志。
+
+```bash
+macos/build.sh
+open "macos/build/ApiAgentControl Monitor.app"
+```
+
+菜单栏图标本身就是状态：`))` 正常、`⚠` 有环节不通、`))/` 已停止。
+面板里能看日志尾巴、一键重启、打开调试页。
+常用的话 `cp -R "macos/build/ApiAgentControl Monitor.app" /Applications/`，
+再到 **系统设置 → 通用 → 登录项** 添加它即可开机常驻。
+
+状态数据来自 daemon 的 `/status` 端点（只监听 `127.0.0.1`，鉴权复用本机 token）。
+开关走 `launchctl bootout` / `bootstrap`——**不是 kill**，因为 launchd 的
+`KeepAlive` 会立刻把被 kill 的进程拉起来，那样开关是关不掉的。
+App 用 swiftc 直接编译、ad-hoc 签名，没有 Xcode 工程，也不碰 iOS 那套构建配置。
+
 ### 三个方案怎么选
 
 | | 要服务器 | 地址固定 | 适合 |
