@@ -158,11 +158,16 @@ class Auth {
     // --- Token 与权限档位 ---
     const tok = Auth.extractToken(req, url);
     if (!tok) return { ok: false, status: 401, error: 'missing token (Authorization: Bearer <token> 或 ?token=)' };
-    let device = this.devices.find(d => timingSafeEqual(d.token, tok));
-    if (!device && this._reloadIfChanged()) {
-      // 配对是由另一个进程（--pair）写入文件的，运行中的 daemon 需要重新加载才能认出新设备
-      device = this.devices.find(d => timingSafeEqual(d.token, tok));
-    }
+
+    // 每次都先看文件有没有变，再查表。设备列表由另一个进程（--pair / --revoke-device）
+    // 写入，运行中的 daemon 必须跟上。
+    //
+    // 此前这里写成"查不到才重载"，只覆盖了新增设备：**吊销**时旧 token 仍在内存列表里
+    // 查得到，于是永远不触发重载，被吊销的设备可以一直用到 daemon 重启为止 ——
+    // 而"手机丢了赶紧吊销"正是这个功能唯一的用途，形同虚设。
+    // 代价只是每个请求一次 statSync（mtime 没变就直接返回）。
+    this._reloadIfChanged();
+    const device = this.devices.find(d => timingSafeEqual(d.token, tok));
     if (!device) return { ok: false, status: 401, error: 'invalid token' };
     if (RANK[device.scope] < RANK[need]) {
       return { ok: false, status: 403, error: `insufficient scope: 需要 ${need}，该设备为 ${device.scope}` };
