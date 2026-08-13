@@ -319,6 +319,11 @@ macos/build.sh --install
 开机常驻：**系统设置 → 通用 → 登录项 → ＋** 添加它。
 不加 `--install` 就只构建到 `macos/build/`，不动「应用程序」。
 
+要分发给别人，用 `macos/build.sh --release`：Developer ID 签名 + 公证 + 打成
+`.dmg`，对方下载双击即可，不会被 Gatekeeper 拦。**不能走 App Store / TestFlight**
+——上架强制要求 App Sandbox，而本 App 的核心动作（执行 `launchctl` 起停 daemon、
+读 `~/.codex-watchd/`）在沙盒下全部被禁止，开关和沙盒互斥。
+
 状态数据来自 daemon 的 `/status` 端点（只监听 `127.0.0.1`，鉴权复用本机 token）。
 开关走 `launchctl bootout` / `bootstrap`——**不是 kill**，因为 launchd 的
 `KeepAlive` 会立刻把被 kill 的进程拉起来，那样开关是关不掉的。
