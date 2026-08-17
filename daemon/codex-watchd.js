@@ -1337,11 +1337,22 @@ async function runPairing() {
     ...(RELAY_SECRET ? { secret: RELAY_SECRET } : {}),
   })).toString('base64url');
 
+  const url = `apiagentcontrol://pair?d=${payload}`;
+
   console.log(`${C.bold}配对信息${C.reset}（有效期内一次性使用，勿转发给他人）`);
   console.log(`  设备 id: ${dev.id}   权限: ${C.bold}${dev.scope}${C.reset}`);
-  console.log(`\napiagentcontrol://pair?d=${payload}\n`);
-  console.log(`${C.dim}装了 qrencode 可直接生成二维码：${C.reset}`);
-  console.log(`${C.dim}  qrencode -t ANSIUTF8 "apiagentcontrol://pair?d=${payload.slice(0, 24)}..."${C.reset}`);
+  console.log(`\n${url}\n`);
+
+  // 直接把码画出来，而不是提示用户"自己拿这串去跑 qrencode"。
+  // 之前那行提示里的配对串是截断的（末尾 ...），照着复制会得到一个扫不出来的码——
+  // 配对是新用户的第一步，在这里设个陷阱等于劝退。
+  try {
+    require('child_process').execFileSync('qrencode', ['-t', 'ANSIUTF8', url],
+      { stdio: ['ignore', 'inherit', 'ignore'] });
+  } catch {
+    console.log(`${C.dim}（装上 qrencode 可直接在终端画出二维码：brew install qrencode）`);
+    console.log(`  也可以把上面这一整行链接发到手机上直接点开。${C.reset}`);
+  }
   if (PAIR_SCOPE === 'control') {
     console.log(`${C.yellow}注意：control 档位等同远程 shell，仅授予你完全信任的设备。${C.reset}`);
   }
