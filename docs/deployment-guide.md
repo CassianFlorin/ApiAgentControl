@@ -137,8 +137,22 @@ APNs 凭证按 **Apple 开发者团队 + Bundle ID** 锁死，作者的推送密
 | 装作者分发的包 + 自部署后台 | ✓ 全部可用 | ✗ 不可用 |
 | 从源码构建（自己的 Bundle ID + 自己的 APNs 密钥） | ✓ | ✓ |
 
-要推送就从源码构建：需要 Apple 开发者账号（$99/年），把工程 Bundle ID 换成自己的、
-在开发者后台开 Push Notifications 能力、生成 APNs 密钥（`.p8`），然后在
+这条边界不是配置问题,是签名事实:APNs 是 Apple 的服务器,不存在"换成自己的推送
+服务器"这个选项。能配的只是**谁有权发**,而这个授权只发给拥有该 Bundle ID 的团队。
+你手里若是作者签名的包,设备 token 就属于作者的 Bundle ID,你自己的 `.p8` 推过去
+只会被 APNs 拒掉（`TopicDisallowed`）。
+
+要推送就从源码构建。需要 Apple 开发者账号（$99/年），改两处设置即可：
+
+在 Xcode 里打开 `ios/ApiAgentControl.xcodeproj`，选中 target → Signing & Capabilities，
+把 **Team** 换成你自己的、**Bundle Identifier** 换成你自己的（如
+`com.yourname.apiagentcontrol`）。Debug 和 Release 两个配置都要改 —— 对应
+`project.pbxproj` 里的 `DEVELOPMENT_TEAM` 和 `PRODUCT_BUNDLE_IDENTIFIER` 各两处。
+签名是 Automatic，改完 Xcode 会自动申请描述文件。
+
+`aps-environment` 的两份 entitlements **不用动**，工程已按 Debug/Release 拆好了。
+
+然后在开发者后台开 Push Notifications 能力、生成 APNs 密钥（`.p8`），在
 `~/.codex-watchd/auth.json` 加：
 
 ```jsonc
@@ -156,7 +170,19 @@ APNs 凭证按 **Apple 开发者团队 + Bundle ID** 锁死，作者的推送密
 > **TestFlight 走的是 production APNs**（反直觉但确实如此）。配错不报错、
 > 无日志，推送静默失效。改完必须重启 daemon。
 
-只装官方包不配推送的话，app 在前台一切正常，只是退后台收不到通知。
+只装作者分发的包、不自建推送的话，app 在前台一切正常，只是退后台收不到通知。
+这种情况 app 里看得见：设置页 →「通知」会显示「电脑端未配置推送」，不会让你
+以为是通知坏了。
+
+配完之后确认走通了：
+
+```bash
+curl -s "http://127.0.0.1:8787/me?token=<你的设备 token>"
+# 期望 "push": {"configured": true, "tokenRegistered": true}
+```
+
+`configured` 为假是 daemon 没读到 apns 段；`tokenRegistered` 为假是手机的 token
+还没报上来（连上后几秒内自动补交，长期不变就在手机上重连一次）。
 
 ## 排查速查
 
