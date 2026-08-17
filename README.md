@@ -17,6 +17,9 @@
 
 # 使用手册
 
+> 拿到 TestFlight 邀请、想知道先干什么？[docs/tester-quickstart.md](docs/tester-quickstart.md)
+> 是一页纸的上手说明（含「推送为什么收不到」）。
+>
 > 只想尽快跑起来？[docs/deployment-guide.md](docs/deployment-guide.md)
 > 是从零到手机可用的一页式部署教程（本地快速方案 / VPS 固定方案二选一）。
 
