@@ -85,6 +85,12 @@ app 在前台时靠加密长连接实时刷新，不受影响。
 
 daemon 启动时会打印 `推送 APNs 沙盒环境, bundle=...`；没配置则打印"未配置"并跳过。
 
+**没配置这件事 App 里看得见**：`/me` 会返回 `push.configured` 和
+`push.tokenRegistered`，设置页的「通知」一节据此显示「电脑端未配置推送」或
+「本机尚未在电脑端登记」。手机侧一切正常、电脑侧根本没在发，是自托管场景的常态
+（`.p8` 锁死在开发者自己的 team + bundleId 上，别人自建 daemon 签发不出来），
+不明说的话用户只会以为通知坏了。
+
 **`production` 必须与 App 的构建配置对上**，这是最容易静默失效的地方：
 
 | App 怎么装的 | 构建配置 | entitlements 的 `aps-environment` | auth.json 的 `production` |

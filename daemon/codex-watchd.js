@@ -1458,7 +1458,15 @@ function startServer() {
       // 客户端据此获知**当前**权限档位。配对时的档位只是快照，
       // 之后可能被吊销或调整；客户端若一直信任本地快照，就会显示自己其实没有的权限。
       const d = verdict.device;
-      return sendJson(res, 200, { deviceId: d.id, name: d.name ?? d.id, scope: d.scope });
+      return sendJson(res, 200, {
+        deviceId: d.id, name: d.name ?? d.id, scope: d.scope,
+        // 推送失效是**静默**的：没配 APNs 就什么都不发，App 那侧看不出区别，
+        // 只会觉得"通知坏了"。自托管场景这是常态 —— .p8 锁死在开发者的 team +
+        // bundleId 上，别人自建 daemon 根本签发不出来。所以把两种失效都报给客户端：
+        //   configured=false  电脑端没配 APNs，谁都收不到
+        //   tokenRegistered=false  配了，但这台设备的 token 没上报成功，只有它收不到
+        push: { configured: !!push, tokenRegistered: !!d.pushToken },
+      });
     }
 
     if (url.pathname === '/events') {

@@ -136,7 +136,20 @@ final class AppState: ObservableObject {
 
     // MARK: - 数据加载
 
-    struct Me: Decodable { let deviceId: String; let name: String; let scope: String }
+    struct Me: Decodable {
+        let deviceId: String
+        let name: String
+        let scope: String
+        let push: DaemonPush?
+
+        /// 电脑端的推送状态。旧版 daemon 不返回这个字段，所以是可选的 ——
+        /// 缺失时不报警，只是没得说。
+        struct DaemonPush: Decodable { let configured: Bool; let tokenRegistered: Bool }
+    }
+
+    /// 电脑端是否配了 APNs、以及本机 token 有没有落到电脑端。
+    /// 这两项任一为假，通知就是收不到的，而且**不会有任何报错** —— 必须显式告诉用户。
+    @Published var daemonPush: Me.DaemonPush?
 
     func refresh() async {
         guard relay.state.isUsable else { return }
@@ -146,6 +159,7 @@ final class AppState: ObservableObject {
             // 先确认凭证与当前档位，再拉数据 —— 凭证失效时要立刻让用户知道
             let me = try await relay.get("/me", as: Me.self)
             serverScope = Scope(rawValue: me.scope)
+            daemonPush = me.push
             authFailed = false
 
             let groups = try await relay.get("/projects?days=30", as: [ProjectGroup].self)

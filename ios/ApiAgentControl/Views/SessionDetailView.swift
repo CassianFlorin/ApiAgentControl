@@ -319,6 +319,35 @@ struct SettingsView: View {
                     if let e = app.push.lastError {
                         Text(e).font(.caption2).foregroundStyle(.secondary)
                     }
+
+                    // 手机这侧一切正常、电脑那侧根本没在发 —— 这种组合以前完全看不出来，
+                    // 用户只会以为是通知坏了。自托管场景下没配 APNs 是常态，必须说清楚。
+                    if let dp = app.daemonPush {
+                        if !dp.configured {
+                            Label {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("电脑端未配置推送").font(.subheadline.weight(.medium))
+                                    Text("即使手机这侧已开启，也不会收到任何通知。"
+                                         + "需要在电脑上的 ~/.codex-watchd/auth.json 里填 apns 段并重启 daemon。")
+                                        .font(.caption2).foregroundStyle(.secondary)
+                                }
+                            } icon: {
+                                Image(systemName: "bell.slash").foregroundStyle(Color.orange)
+                            }
+                        } else if !dp.tokenRegistered {
+                            Label {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("本机尚未在电脑端登记").font(.subheadline.weight(.medium))
+                                    Text("电脑端推送是通的，但还没收到这台设备的 token。"
+                                         + "通常连上后几秒内自动补交，长期不变就重连一次。")
+                                        .font(.caption2).foregroundStyle(.secondary)
+                                }
+                            } icon: {
+                                Image(systemName: "clock.badge.exclamationmark").foregroundStyle(Color.orange)
+                            }
+                        }
+                    }
+
                     Text("通知内容不含任何会话信息 —— APNs 服务器能看到推送体，"
                          + "所以只写「有一条需要处理」，真实内容在你点开后由 App 经加密通道取回。")
                         .font(.caption2).foregroundStyle(.secondary)
