@@ -51,6 +51,21 @@ scripts/start.sh
 
 完整步骤、验收方法和排查表都在 [部署教程](deployment-guide.md)。
 
+## 以后怎么更新
+
+两边分开更新，互不等待，版本之间保持兼容，已配对的手机**不用重新配对**：
+
+- **App**：TestFlight 出新版会给你推通知，默认自动更新，不用做什么。
+- **电脑端**：在仓库目录里拉最新代码，再把后台重启一遍：
+
+```bash
+git pull
+```
+
+方案 A 重跑 `scripts/start.sh` 即可；方案 B（launchd）用
+`launchctl kickstart -k gui/$(id -u)/com.apiagentcontrol.daemon`。
+不重启的话跑的还是旧进程，拉了代码也不生效。
+
 ## 两条安全提醒
 
 - **配对时的 `control` 档位等同一个远程 shell**——手机能让 Codex 在你电脑上执行

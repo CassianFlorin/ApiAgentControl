@@ -244,6 +244,9 @@ launchctl kickstart -k gui/$(id -u)/com.apiagentcontrol.daemon
 
 中继侧同理：重新 `scp` + `docker build` + `docker rm -f apiagent-relay` 再 run。
 
+App 侧不用你管：TestFlight 自动更新。两边互不等待、跨版本兼容，
+先更新哪边都行，已配对的手机不需要重新配对。
+
 **管理设备**——手机丢了、或想收回某台设备的权限：
 
 ```bash
@@ -290,5 +293,6 @@ node daemon/codex-watchd.js --revoke-device <设备 id>   # 立即失效，无�
 | 推送收不到 | `production` 与安装方式是否匹配；设置页有没有提示「电脑端未配置推送」 |
 | 发指令报 409 | 该会话正开在 Codex Desktop 里（单写者约束）。列表里会标锁图标，**退出 Desktop 才释放**，仅在界面里离开会话没用 |
 | 隧道重启后连不上 | 方案 A 的域名变了，重新配对；长期用请上方案 B |
+| 扫码提示「中继地址无效」 | `--relay` 必须以 `ws://` 或 `wss://` 开头。`git pull` 更新后重新 `--pair`，新版会自动纠正 `https://`、漏协议头这类笔误 |
 
 更多细节：[README](../README.md)（使用手册 / 中继部署 / 发版）、[relay.md](relay.md)（中继协议与踩坑）、[push.md](push.md)（推送完整说明）。
