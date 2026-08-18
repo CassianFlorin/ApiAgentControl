@@ -20,13 +20,24 @@ struct PairingPayload: Codable {
         guard let range = cleaned.range(of: "d=") else { throw PairingError.malformed }
         let payload = String(cleaned[range.upperBound...])
         guard !payload.isEmpty, let raw = B64URL.decode(payload) else { throw PairingError.malformed }
-        return try JSONDecoder().decode(PairingPayload.self, from: raw)
+        let p = try JSONDecoder().decode(PairingPayload.self, from: raw)
+        // 中继地址必须在这里就校验：坏地址一旦存进 Keychain，之后每次启动
+        // 自动重连都会在 webSocketTask 上崩掉（ObjC 异常拦不住），app 直接废掉。
+        guard RelayClient.websocketURL(from: p.relay) != nil else { throw PairingError.badRelay(p.relay) }
+        return p
     }
 }
 
 enum PairingError: Error, LocalizedError {
     case malformed
-    var errorDescription: String? { "配对串格式不正确" }
+    case badRelay(String)
+    var errorDescription: String? {
+        switch self {
+        case .malformed: return "配对串格式不正确"
+        case .badRelay(let r):
+            return "中继地址无效（\(r)）：需要 ws:// 或 wss:// 开头。请在电脑端检查 --relay 参数后重新生成配对码"
+        }
+    }
 }
 
 /// 权限档位。风险差一个数量级，UI 上要如实呈现。

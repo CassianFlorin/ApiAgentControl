@@ -118,9 +118,33 @@ final class RelayClient: NSObject, ObservableObject {
         state = .idle
     }
 
+    /// 把配对串里的中继地址整理成 URLSession 接受的 ws/wss URL；整理不出来返回 nil。
+    ///
+    /// `webSocketTask(with:)` 对 ws/wss 之外的 scheme 抛的是 **ObjC 异常**，Swift 拦不住，
+    /// 直接崩溃。而配对串里的 relay 是用户在 daemon 侧 `--relay` 随手输入的——真机反馈里
+    /// 就撞到过：写成 https:// 或者干脆漏了 scheme（`host:8080` 会被解析成 scheme=host）。
+    /// 坏地址一旦存进 Keychain，每次启动 `AppState.init` 自动重连都会崩，
+    /// 用户连进 app 解除配对的机会都没有，只能重装。所以必须在这里挡住，
+    /// 并且配对扫码时（`PairingPayload.parse`）就用同一个函数提前拒绝。
+    nonisolated static func websocketURL(from relay: String) -> URLComponents? {
+        guard var comps = URLComponents(string: relay) else { return nil }
+        switch comps.scheme?.lowercased() {
+        case "ws", "wss": break
+        case "http": comps.scheme = "ws"      // 顺手纠正常见笔误，而不是让用户重新配对
+        case "https": comps.scheme = "wss"
+        default: return nil
+        }
+        guard let host = comps.host, !host.isEmpty else { return nil }
+        return comps
+    }
+
     private func openSocket() {
-        guard let p = pairing, var comps = URLComponents(string: p.relay) else { return }
-        // 中继地址用 ws/wss，URLSession 直接支持
+        guard let p = pairing else { return }
+        guard var comps = Self.websocketURL(from: p.relay) else {
+            // 老版本存下的坏配对会走到这里：给出可见的失败而不是崩溃，用户才有机会解除配对
+            state = .failed("中继地址无效（\(p.relay)），请解除配对后重新配对")
+            return
+        }
         var items = [URLQueryItem(name: "room", value: p.room), URLQueryItem(name: "role", value: "client")]
         if let s = p.secret { items.append(URLQueryItem(name: "secret", value: s)) }
         comps.queryItems = items

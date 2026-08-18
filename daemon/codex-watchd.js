@@ -66,7 +66,23 @@ const DEVICE_SCOPE = opt('--scope', 'read');
 const REVOKE_DEVICE = opt('--revoke-device', null);
 const LIST_DEVICES = flag('--list-devices');
 // 中继
-const RELAY_URL = opt('--relay', null);
+let RELAY_URL = opt('--relay', null);
+
+// 把用户输入的中继地址整理成 ws/wss；整理不出来返回 null。
+// 常见笔误直接纠正：http(s) 换成 ws(s)，裸的 host:port 补上 ws://。
+function normalizeRelayUrl(raw) {
+  let s = String(raw).trim();
+  if (/^https?:\/\//i.test(s)) s = s.replace(/^http/i, 'ws');
+  else if (!/^wss?:\/\//i.test(s)) {
+    if (/^[a-z0-9]/i.test(s) && !s.includes('://')) s = `ws://${s}`;
+    else return null;
+  }
+  try {
+    const u = new URL(s);
+    if (!u.hostname) return null;
+    return u.toString().replace(/\/$/, '');
+  } catch { return null; }
+}
 const RELAY_SECRET = opt('--relay-secret', process.env.RELAY_SECRET || '');
 const PAIR = flag('--pair');
 // 默认与 --add-device 保持一致，都是最小权限 read。
@@ -1286,6 +1302,17 @@ function proxyToSelf({ method = 'GET', path: p = '/', body, token }) {
 
 async function startRelay() {
   if (!RELAY_URL) return;
+  // 与 --pair 同一套校验：地址不对就明确报错退出，而不是让 ws 库在深处抛异常
+  const normalized = normalizeRelayUrl(RELAY_URL);
+  if (!normalized) {
+    console.error(`${C.red}--relay 地址无效：${RELAY_URL}`);
+    console.error(`需要 ws:// 或 wss:// 开头，例如 wss://your-vps.example.com:8443${C.reset}`);
+    process.exit(1);
+  }
+  if (normalized !== RELAY_URL) {
+    console.log(`${C.yellow}--relay 已自动纠正为 ${normalized}${C.reset}`);
+    RELAY_URL = normalized;
+  }
   if (!auth.enabled) {
     console.error(`${C.red}拒绝启动中继：--no-auth 下不能接入中继。${C.reset}`);
     process.exit(1);
@@ -1327,6 +1354,18 @@ async function runPairing() {
   if (!RELAY_URL) {
     console.error(`${C.red}--pair 需要同时指定 --relay <ws://...>${C.reset}`);
     process.exitCode = 1; return;
+  }
+  // 地址进了二维码就没有回头路：iOS 端拿到 ws/wss 之外的 scheme 会直接连不上
+  //（旧版 app 甚至会启动崩溃）。在这里挡住，比让用户扫完码在手机上看报错强得多。
+  const normalized = normalizeRelayUrl(RELAY_URL);
+  if (!normalized) {
+    console.error(`${C.red}--relay 地址无效：${RELAY_URL}`);
+    console.error(`需要 ws:// 或 wss:// 开头，例如 wss://your-vps.example.com:8443${C.reset}`);
+    process.exitCode = 1; return;
+  }
+  if (normalized !== RELAY_URL) {
+    console.log(`${C.yellow}--relay 已自动纠正为 ${normalized}${C.reset}`);
+    RELAY_URL = normalized;
   }
   const id = await ensureRelayIdentity();
   const a = await new Auth({ enabled: true }).load();
